@@ -34,6 +34,11 @@
       <h3 id="nameDialogTitle">報名</h3>
       <label for="studentName">你的名字</label>
       <input id="studentName" name="studentName" maxlength="30" required>
+
+      <label for="studentPin">PIN 碼（4-6 位數字或字母，用來驗證身份）</label>
+      <input id="studentPin" name="studentPin" maxlength="6" required placeholder="e.g. 1234 或 abc12">
+      <p class="muted" style="font-size: 12px; margin: -8px 0 0;">PIN 越複雜越安全。避免重複同一字符（如 0000 或 aaaa）。</p>
+
       <menu>
         <button value="cancel" class="button secondary">取消</button>
         <button value="confirm" class="button">確認</button>
@@ -42,7 +47,10 @@
   </dialog>
 
   <dialog id="statusDialog">
-    <form method="dialog" id="statusForm" class="dialog-form">
+    <form method="confirmPin">請輸入你的 PIN 碼</label>
+      <input id="confirmPin" maxlength="6" required placeholder="e.g. 1234">
+
+      <label for="dialog" id="statusForm" class="dialog-form">
       <h3>更新狀態</h3>
       <label for="confirmName">請再次輸入你的名字</label>
       <input id="confirmName" maxlength="30" required>

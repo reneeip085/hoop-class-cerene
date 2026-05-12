@@ -20,10 +20,12 @@ const nameDialog = document.getElementById("nameDialog");
 const nameForm = document.getElementById("nameForm");
 const nameDialogTitle = document.getElementById("nameDialogTitle");
 const studentNameInput = document.getElementById("studentName");
+const studentPinInput = document.getElementById("studentPin");
 
 const statusDialog = document.getElementById("statusDialog");
 const statusForm = document.getElementById("statusForm");
 const confirmNameInput = document.getElementById("confirmName");
+const confirmPinInput = document.getElementById("confirmPin");
 const statusSelect = document.getElementById("statusSelect");
 const cancelBookingBtn = document.getElementById("cancelBookingBtn");
 
@@ -35,6 +37,19 @@ let activeStatusSeatIndex = null;
 
 function normalizeName(name) {
   return name.trim().replace(/\s+/g, " ");
+}
+
+function validatePin(pin) {
+  if (!pin || pin.length < 4 || pin.length > 6) {
+    throw new Error("PIN 碼必須 4-6 位");
+  }
+  const trimmed = pin.toLowerCase();
+  if (/^(.)\1+$/.test(trimmed)) {
+    throw new Error("PIN 碼不能是重複的字符（如 0000、aaaa）");
+  }
+  if (!/^[a-z0-9]+$/i.test(pin)) {
+    throw new Error("PIN 碼只能用英文字母或數字");
+  }
 }
 
 function parseClassDateTime(classItem) {
@@ -129,6 +144,11 @@ function classCard(item, isHistory) {
       name.textContent = `${i + 1}. ${value.name}`;
       seat.appendChild(name);
 
+      const pin = document.createElement("div");
+      pin.className = "status";
+      pin.textContent = `PIN: ${value.pin || "N/A"}`;
+      seat.appendChild(pin);
+
       const status = document.createElement("div");
       status.className = "status";
       status.textContent = value.status || STATUS_DEFAULT;
@@ -188,7 +208,7 @@ function openNameDialog(classId, seatIndex) {
   nameDialog.showModal();
 }
 
-async function signup(classId, seatIndex, studentName) {
+async function signup(classId, seatIndex, studentName, studentPin) {
   const classRef = doc(db, "classes", classId);
   await runTransaction(db, async (transaction) => {
     const snap = await transaction.get(classRef);
@@ -215,6 +235,7 @@ async function signup(classId, seatIndex, studentName) {
 
     seats[seatIndex] = {
       name: studentName,
+      pin: studentPin,
       status: STATUS_DEFAULT,
       updatedAt: Date.now(),
     };
@@ -231,11 +252,13 @@ function openStatusDialog(classId, seatIndex, name, status) {
   activeStatusSeatIndex = seatIndex;
   confirmNameInput.value = "";
   confirmNameInput.placeholder = `輸入 ${name}`;
+  confirmPinInput.value = "";
+  confirmPinInput.placeholder = "輸入你的 PIN 碼";
   statusSelect.value = status || STATUS_DEFAULT;
   statusDialog.showModal();
 }
 
-async function updateStatus(classId, seatIndex, confirmName, newStatus) {
+async function updateStatus(classId, seatIndex, confirmName, confirmPin, newStatus) {
   const classRef = doc(db, "classes", classId);
   await runTransaction(db, async (transaction) => {
     const snap = await transaction.get(classRef);
@@ -255,6 +278,10 @@ async function updateStatus(classId, seatIndex, confirmName, newStatus) {
       throw new Error("名字不一致，不能修改");
     }
 
+    if (seat.pin !== confirmPin) {
+      throw new Error("PIN 碼錯誤，不能修改");
+    }
+
     seat.status = newStatus;
     seat.updatedAt = Date.now();
     seats[seatIndex] = seat;
@@ -266,7 +293,7 @@ async function updateStatus(classId, seatIndex, confirmName, newStatus) {
   });
 }
 
-async function cancelBooking(classId, seatIndex, confirmName) {
+async function cancelBooking(classId, seatIndex, confirmName, confirmPin) {
   const classRef = doc(db, "classes", classId);
   await runTransaction(db, async (transaction) => {
     const snap = await transaction.get(classRef);
@@ -286,6 +313,10 @@ async function cancelBooking(classId, seatIndex, confirmName) {
       throw new Error("名字不一致，不能取消");
     }
 
+    if (seat.pin !== confirmPin) {
+      throw new Error("PIN 碼錯誤，不能取消");
+    }
+
     seats[seatIndex] = null;
     transaction.update(classRef, {
       seats,
@@ -302,13 +333,16 @@ nameForm.addEventListener("submit", async (event) => {
 
   event.preventDefault();
   const studentName = normalizeName(studentNameInput.value);
+  const studentPin = studentPinInput.value;
+
   if (!studentName) {
     alert("請輸入名字");
     return;
   }
 
   try {
-    await signup(pendingSignupClassId, pendingSeatIndex, studentName);
+    validatePin(studentPin);
+    await signup(pendingSignupClassId, pendingSeatIndex, studentName, studentPin);
     nameDialog.close();
   } catch (error) {
     alert(error.message || "報名失敗");
@@ -323,13 +357,20 @@ statusForm.addEventListener("submit", async (event) => {
 
   event.preventDefault();
   const confirmName = normalizeName(confirmNameInput.value);
+  const confirmPin = confirmPinInput.value;
+
   if (!confirmName) {
     alert("請輸入名字");
     return;
   }
 
+  if (!confirmPin) {
+    alert("請輸入 PIN 碼");
+    return;
+  }
+
   try {
-    await updateStatus(activeStatusClassId, activeStatusSeatIndex, confirmName, statusSelect.value);
+    await updateStatus(activeStatusClassId, activeStatusSeatIndex, confirmName, confirmPin, statusSelect.value);
     statusDialog.close();
   } catch (error) {
     alert(error.message || "更新失敗");
@@ -338,8 +379,15 @@ statusForm.addEventListener("submit", async (event) => {
 
 cancelBookingBtn.addEventListener("click", async () => {
   const confirmName = normalizeName(confirmNameInput.value);
+  const confirmPin = confirmPinInput.value;
+
   if (!confirmName) {
     alert("請先輸入名字確認");
+    return;
+  }
+
+  if (!confirmPin) {
+    alert("請先輸入 PIN 碼");
     return;
   }
 
@@ -348,7 +396,7 @@ cancelBookingBtn.addEventListener("click", async () => {
   }
 
   try {
-    await cancelBooking(activeStatusClassId, activeStatusSeatIndex, confirmName);
+    await cancelBooking(activeStatusClassId, activeStatusSeatIndex, confirmName, confirmPin);
     statusDialog.close();
   } catch (error) {
     alert(error.message || "取消失敗");
