@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-HK">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cerence Private class - 班期管理</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div>
+      <h1>Cerence Private class - 班期管理</h1>
+      <p class="muted">按日期搜尋並管理班期</p>
+    </div>
+    <div class="inline-buttons">
+      <a class="button secondary" href="admin.html">返回 Admin</a>
+      <a class="button secondary" href="index.html">返回學生頁</a>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="card stack">
+      <h2>搜尋條件</h2>
+      <label for="searchDate">日期</label>
+      <div class="inline-buttons">
+        <input type="date" id="searchDate">
+        <button id="clearSearch" class="button secondary" type="button">清除搜尋</button>
+        <button id="sortToggle" class="button secondary" type="button">時間 ↑</button>
+      </div>
+      <p class="muted">留空即顯示所有班期。</p>
+    </section>
+
+    <section>
+      <h2>班期列表</h2>
+      <div id="classList" class="cards"></div>
+      <p id="noClass" class="muted hidden">找不到對應班期。</p>
+    </section>
+  </main>
+
+  <script type="module" src="class-management.js"></script>
+</body>
+</html>

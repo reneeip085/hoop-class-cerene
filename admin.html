@@ -13,6 +13,8 @@
       <p class="muted">新增、編輯、刪除班期及管理名單</p>
     </div>
     <div class="inline-buttons">
+      <a class="button secondary" href="class-management.html">班期管理</a>
+      <a class="button secondary" href="history.html">歷史紀錄</a>
       <a class="button secondary" href="admin-history.html">操作歷史</a>
       <a class="button secondary" href="index.html">返回學生頁</a>
     </div>
@@ -40,11 +42,11 @@
         <div class="grid2">
           <div>
             <label for="startTime">開始時間</label>
-            <input type="time" id="startTime" required>
+            <select id="startTime" required></select>
           </div>
           <div>
             <label for="endTime">結束時間</label>
-            <input type="time" id="endTime" required>
+            <select id="endTime" required></select>
           </div>
         </div>
 
@@ -68,9 +70,10 @@
         </div>
       </form>
 
-      <section>
+      <section class="card">
         <h2>班期管理</h2>
-        <div id="adminClassList" class="cards"></div>
+        <p class="muted">已移至獨立頁面，支援按日期搜尋。</p>
+        <a class="button secondary" href="class-management.html">前往班期管理</a>
       </section>
     </section>
   </main>

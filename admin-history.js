@@ -1,5 +1,6 @@
 import { db, collection, onSnapshot } from "./firebase.js";
 
+const ADMIN_AUTH_KEY = "cerence_admin_authed";
 const operationList = document.getElementById("operationList");
 const noOperation = document.getElementById("noOperation");
 
@@ -58,3 +59,8 @@ onSnapshot(collection(db, "operations"), (snapshot) => {
     .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   render();
 });
+
+if (sessionStorage.getItem(ADMIN_AUTH_KEY) !== "1") {
+  alert("請先在 Admin 頁面登入。");
+  window.location.href = "admin.html";
+}

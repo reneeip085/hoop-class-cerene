@@ -52,6 +52,17 @@ function parseClassDateTime(classItem) {
   return new Date(`${classItem.date}T${classItem.startTime}:00`);
 }
 
+function formatClassHeader(dateStr, startTime, endTime) {
+  const dateObj = new Date(`${dateStr}T00:00:00`);
+  const dayText = dateObj.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+  const weekday = dateObj.toLocaleDateString("en-GB", { weekday: "short" });
+  return `${dayText} (${weekday}) ${startTime}-${endTime}`;
+}
+
 function getUpcoming(items) {
   const now = new Date();
   return items
@@ -69,7 +80,7 @@ function logOperation(action, details) {
 }
 
 function classHeading(item) {
-  return `${item.date} ${item.startTime}-${item.endTime}`;
+  return formatClassHeader(item.date, item.startTime, item.endTime);
 }
 
 function classCard(item) {

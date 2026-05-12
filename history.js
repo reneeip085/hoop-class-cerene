@@ -1,6 +1,7 @@
 import { db, collection, onSnapshot } from "./firebase.js";
 
 const CLASS_CAPACITY = 6;
+const ADMIN_AUTH_KEY = "cerence_admin_authed";
 const historyContainer = document.getElementById("historyClasses");
 const noHistory = document.getElementById("noHistory");
 
@@ -8,6 +9,17 @@ let classes = [];
 
 function parseClassDateTime(classItem) {
   return new Date(`${classItem.date}T${classItem.startTime}:00`);
+}
+
+function formatClassHeader(dateStr, startTime, endTime) {
+  const dateObj = new Date(`${dateStr}T00:00:00`);
+  const dayText = dateObj.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+  const weekday = dateObj.toLocaleDateString("en-GB", { weekday: "short" });
+  return `${dayText} (${weekday}) ${startTime}-${endTime}`;
 }
 
 function getHistory(items) {
@@ -18,7 +30,7 @@ function getHistory(items) {
 }
 
 function classHeading(item) {
-  return `${item.date} ${item.startTime}-${item.endTime}`;
+  return formatClassHeader(item.date, item.startTime, item.endTime);
 }
 
 function classCard(item) {
@@ -82,3 +94,8 @@ onSnapshot(collection(db, "classes"), (snapshot) => {
   classes = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
   render();
 });
+
+if (sessionStorage.getItem(ADMIN_AUTH_KEY) !== "1") {
+  alert("請先在 Admin 頁面登入。");
+  window.location.href = "admin.html";
+}

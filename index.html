@@ -3,75 +3,63 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Yoga Class Booking</title>
+  <title>Cerence Private class</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <header class="site-header">
     <div>
-      <!doctype html>
-      <html lang="zh-HK">
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>Cerence Private class</title>
-        <link rel="stylesheet" href="styles.css">
-      </head>
-      <body>
-        <header class="site-header">
-          <div>
-            <h1>Cerence Private class</h1>
-          </div>
-          <div class="inline-buttons">
-            <a class="button secondary" href="history.html">歷史記錄</a>
-            <a class="button secondary" href="admin.html">老師管理</a>
-          </div>
-        </header>
+      <h1>Cerence Private class</h1>
+    </div>
+    <div class="inline-buttons">
+      <a class="button secondary" href="admin.html">老師管理</a>
+    </div>
+  </header>
 
-        <main class="layout">
-          <section>
-            <h2>即將開班</h2>
-            <div id="upcomingClasses" class="cards"></div>
-            <p id="noUpcoming" class="muted hidden">暫時未有即將開班。</p>
-          </section>
-        </main>
+  <main class="layout">
+    <section>
+      <h2>即將開班</h2>
+      <div id="upcomingClasses" class="cards"></div>
+      <p id="noUpcoming" class="muted hidden">暫時未有即將開班。</p>
+    </section>
+  </main>
 
-        <dialog id="nameDialog">
-          <form method="dialog" id="nameForm" class="dialog-form">
-            <h3 id="nameDialogTitle">報名</h3>
-            <label for="studentName">你的名字</label>
-            <input id="studentName" name="studentName" maxlength="30" required>
+  <dialog id="nameDialog">
+    <form method="dialog" id="nameForm" class="dialog-form">
+      <h3 id="nameDialogTitle">報名</h3>
+      <label for="studentName">你的名字</label>
+      <input id="studentName" name="studentName" maxlength="30" required>
 
-            <label for="studentPin">PIN 碼（4-6 位數字或字母）</label>
-            <input id="studentPin" name="studentPin" maxlength="6" required placeholder="e.g. 1234 或 abc12">
+      <label for="studentPin">PIN 碼（4-6 位數字或字母）</label>
+      <input id="studentPin" name="studentPin" maxlength="6" required placeholder="e.g. 1234 或 abc12">
 
-            <menu>
-              <button value="cancel" class="button secondary">取消</button>
-              <button value="confirm" class="button">確認</button>
-            </menu>
-          </form>
-        </dialog>
+      <menu>
+        <button value="cancel" class="button secondary" formnovalidate>取消</button>
+        <button value="confirm" class="button">確認</button>
+      </menu>
+    </form>
+  </dialog>
 
-        <dialog id="statusDialog">
-          <form method="dialog" id="statusForm" class="dialog-form">
-            <h3>更新狀態</h3>
-            <label for="confirmPin">請輸入你的 PIN 碼</label>
-            <input id="confirmPin" maxlength="6" required placeholder="e.g. 1234">
+  <dialog id="statusDialog">
+    <form method="dialog" id="statusForm" class="dialog-form">
+      <h3>更新狀態</h3>
+      <label for="confirmPin">請輸入你的 PIN 碼</label>
+      <input id="confirmPin" maxlength="6" required placeholder="e.g. 1234">
 
-            <label for="statusSelect">報名狀態</label>
-            <select id="statusSelect" required>
-              <option value="未付留位費">未付留位費</option>
-              <option value="已付留位費 ✅">已付留位費 ✅</option>
-            </select>
+      <label for="statusSelect">報名狀態</label>
+      <select id="statusSelect" required>
+        <option value="未付留位費">未付留位費</option>
+        <option value="已付留位費 ✅">已付留位費 ✅</option>
+      </select>
 
-            <menu>
-              <button type="button" id="cancelBookingBtn" class="button danger">取消報名</button>
-              <button value="dismiss" class="button secondary">關閉</button>
-              <button value="save" class="button">儲存</button>
-            </menu>
-          </form>
-        </dialog>
+      <menu>
+        <button type="button" id="cancelBookingBtn" class="button danger">取消報名</button>
+        <button value="dismiss" class="button secondary" formnovalidate>關閉</button>
+        <button value="save" class="button">儲存</button>
+      </menu>
+    </form>
+  </dialog>
 
-        <script type="module" src="app.js"></script>
-      </body>
-      </html>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

@@ -28,9 +28,8 @@ const endTimeInput = document.getElementById("endTime");
 const locationInput = document.getElementById("location");
 const levelInputs = [...document.querySelectorAll('input[name="levels"]')];
 const songFields = document.getElementById("songFields");
-const adminClassList = document.getElementById("adminClassList");
+const ADMIN_AUTH_KEY = "cerence_admin_authed";
 
-let classCache = [];
 
 function selectedLevels() {
   return levelInputs.filter((x) => x.checked).map((x) => x.value);
@@ -90,12 +89,34 @@ function classDate(item) {
   return new Date(`${item.date}T${item.startTime}:00`);
 }
 
-function sortClasses(items) {
-  return [...items].sort((a, b) => classDate(a) - classDate(b));
+function formatClassHeader(dateStr, startTime, endTime) {
+  const dateObj = new Date(`${dateStr}T00:00:00`);
+  const dayText = dateObj.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+  const weekday = dateObj.toLocaleDateString("en-GB", { weekday: "short" });
+  return `${dayText} (${weekday}) ${startTime}-${endTime}`;
+}
+
+function populateTimeOptions(selectEl) {
+  selectEl.innerHTML = "";
+  for (let hour = 0; hour < 24; hour += 1) {
+    for (let minute = 0; minute < 60; minute += 1) {
+      const hh = String(hour).padStart(2, "0");
+      const mm = String(minute).padStart(2, "0");
+      const value = `${hh}:${mm}`;
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = value;
+      selectEl.appendChild(option);
+    }
+  }
 }
 
 function formatHeader(item) {
-  return `${item.date} ${item.startTime}-${item.endTime}`;
+  return formatClassHeader(item.date, item.startTime, item.endTime);
 }
 
 function resetForm() {
@@ -189,153 +210,6 @@ async function saveClass(event) {
   }
 }
 
-function doubleConfirm(first, second) {
-  if (!confirm(first)) {
-    return false;
-  }
-  return confirm(second);
-}
-
-async function removeClass(id) {
-  if (!doubleConfirm("確定刪除此班期？", "請再次確認：此動作無法復原，是否繼續？")) {
-    return;
-  }
-  await deleteDoc(doc(db, "classes", id));
-  await logOperation("admin_delete_class", { classId: id });
-  if (editingClassId.value === id) {
-    resetForm();
-  }
-}
-
-async function clearSeat(classId, index) {
-  if (!doubleConfirm("確定移除此報名人？", "請再次確認：要移除這位同學嗎？")) {
-    return;
-  }
-
-  const target = classCache.find((x) => x.id === classId);
-  if (!target) {
-    return;
-  }
-
-  const seats = Array.isArray(target.seats) ? [...target.seats] : Array(CLASS_CAPACITY).fill(null);
-  const removedName = seats[index]?.name || "";
-  seats[index] = null;
-
-  await updateDoc(doc(db, "classes", classId), {
-    seats,
-    updatedAt: Date.now(),
-  });
-
-  await logOperation("admin_remove_student", {
-    classId,
-    seatIndex: index,
-    studentName: removedName,
-  });
-}
-
-function renderClassCard(item) {
-  const card = document.createElement("article");
-  card.className = "card";
-
-  const title = document.createElement("div");
-  title.className = "class-title";
-
-  const left = document.createElement("div");
-  const h3 = document.createElement("h3");
-  h3.textContent = formatHeader(item);
-  left.appendChild(h3);
-
-  const p = document.createElement("p");
-  p.className = "meta";
-  p.textContent = `地點：${item.location}`;
-  left.appendChild(p);
-
-  const badges = document.createElement("div");
-  badges.className = "badges";
-  (item.levels || []).forEach((lv) => {
-    const b = document.createElement("span");
-    b.className = "badge";
-    b.textContent = lv;
-    badges.appendChild(b);
-  });
-
-  title.appendChild(left);
-  title.appendChild(badges);
-  card.appendChild(title);
-
-  const songs = document.createElement("ul");
-  songs.className = "song-list";
-  (item.levels || []).forEach((lv) => {
-    const li = document.createElement("li");
-    li.textContent = `${lv} ${item.songs?.[lv] || ""}`;
-    songs.appendChild(li);
-  });
-  card.appendChild(songs);
-
-  const seats = Array.isArray(item.seats) ? item.seats : Array(CLASS_CAPACITY).fill(null);
-  const used = seats.filter(Boolean).length;
-  const meta = document.createElement("p");
-  meta.className = "meta";
-  meta.textContent = `名額：${used}/${CLASS_CAPACITY}`;
-  card.appendChild(meta);
-
-  const seatGrid = document.createElement("div");
-  seatGrid.className = "seat-grid";
-  for (let i = 0; i < CLASS_CAPACITY; i += 1) {
-    const seat = document.createElement("div");
-    seat.className = "seat";
-    const value = seats[i];
-
-    if (value) {
-      const n = document.createElement("div");
-      n.className = "name";
-      n.textContent = `${i + 1}. ${value.name}`;
-      seat.appendChild(n);
-
-      const st = document.createElement("div");
-      st.className = "status";
-      st.textContent = value.status || "未付留位費";
-      seat.appendChild(st);
-
-      const clearBtn = document.createElement("button");
-      clearBtn.className = "button secondary";
-      clearBtn.textContent = "移除";
-      clearBtn.addEventListener("click", () => clearSeat(item.id, i));
-      seat.appendChild(clearBtn);
-    } else {
-      seat.classList.add("empty");
-      seat.textContent = `${i + 1}. 空位`;
-    }
-
-    seatGrid.appendChild(seat);
-  }
-  card.appendChild(seatGrid);
-
-  const actions = document.createElement("div");
-  actions.className = "inline-buttons";
-
-  const editBtn = document.createElement("button");
-  editBtn.className = "button";
-  editBtn.textContent = "編輯";
-  editBtn.addEventListener("click", () => fillForm(item));
-
-  const deleteBtn = document.createElement("button");
-  deleteBtn.className = "button danger";
-  deleteBtn.textContent = "刪除";
-  deleteBtn.addEventListener("click", () => removeClass(item.id));
-
-  actions.appendChild(editBtn);
-  actions.appendChild(deleteBtn);
-  card.appendChild(actions);
-  return card;
-}
-
-function renderClasses() {
-  adminClassList.innerHTML = "";
-  sortClasses(classCache).forEach((item) => {
-    adminClassList.appendChild(renderClassCard(item));
-  });
-}
 
 levelInputs.forEach((x) => x.addEventListener("change", () => {
   const levels = selectedLevels();
@@ -356,13 +230,11 @@ loginForm.addEventListener("submit", (event) => {
     return;
   }
 
+  sessionStorage.setItem(ADMIN_AUTH_KEY, "1");
   loginSection.classList.add("hidden");
   adminSection.classList.remove("hidden");
 });
 
-onSnapshot(collection(db, "classes"), (snapshot) => {
-  classCache = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-  renderClasses();
-});
-
+populateTimeOptions(startTimeInput);
+populateTimeOptions(endTimeInput);
 buildSongFields();
