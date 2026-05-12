@@ -1,0 +1,84 @@
+import { db, collection, onSnapshot } from "./firebase.js";
+
+const CLASS_CAPACITY = 6;
+const historyContainer = document.getElementById("historyClasses");
+const noHistory = document.getElementById("noHistory");
+
+let classes = [];
+
+function parseClassDateTime(classItem) {
+  return new Date(`${classItem.date}T${classItem.startTime}:00`);
+}
+
+function getHistory(items) {
+  const now = new Date();
+  return items
+    .filter((item) => parseClassDateTime(item) < now)
+    .sort((a, b) => parseClassDateTime(b) - parseClassDateTime(a));
+}
+
+function classHeading(item) {
+  return `${item.date} ${item.startTime}-${item.endTime}`;
+}
+
+function classCard(item) {
+  const wrapper = document.createElement("article");
+  wrapper.className = "card";
+
+  const title = document.createElement("div");
+  title.className = "class-title";
+
+  const left = document.createElement("div");
+  const h3 = document.createElement("h3");
+  h3.textContent = classHeading(item);
+  left.appendChild(h3);
+
+  const meta = document.createElement("p");
+  meta.className = "meta";
+  meta.textContent = `地點：${item.location}`;
+  left.appendChild(meta);
+
+  const right = document.createElement("div");
+  right.className = "badges";
+  (item.levels || []).forEach((lv) => {
+    const b = document.createElement("span");
+    b.className = "badge";
+    b.textContent = lv;
+    right.appendChild(b);
+  });
+
+  title.appendChild(left);
+  title.appendChild(right);
+  wrapper.appendChild(title);
+
+  const songs = document.createElement("ul");
+  songs.className = "song-list";
+  for (const lv of item.levels || []) {
+    const li = document.createElement("li");
+    li.textContent = `${lv} ${item.songs?.[lv] || ""}`;
+    songs.appendChild(li);
+  }
+  wrapper.appendChild(songs);
+
+  const seats = Array.isArray(item.seats) ? item.seats : [];
+  const used = seats.filter(Boolean).length;
+
+  const seatMeta = document.createElement("p");
+  seatMeta.className = "meta";
+  seatMeta.textContent = `出席：${used}/${CLASS_CAPACITY}`;
+  wrapper.appendChild(seatMeta);
+
+  return wrapper;
+}
+
+function render() {
+  const history = getHistory(classes);
+  historyContainer.innerHTML = "";
+  noHistory.classList.toggle("hidden", history.length > 0);
+  history.forEach((item) => historyContainer.appendChild(classCard(item)));
+}
+
+onSnapshot(collection(db, "classes"), (snapshot) => {
+  classes = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+  render();
+});

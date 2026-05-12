@@ -2,19 +2,16 @@ import {
   db,
   collection,
   doc,
-  updateDoc,
+  addDoc,
   onSnapshot,
   runTransaction,
 } from "./firebase.js";
 
 const CLASS_CAPACITY = 6;
 const STATUS_DEFAULT = "未付留位費";
-const STATUS_PAID = "已付留位費 ✅";
 
 const upcomingContainer = document.getElementById("upcomingClasses");
-const historyContainer = document.getElementById("historyClasses");
 const noUpcoming = document.getElementById("noUpcoming");
-const noHistory = document.getElementById("noHistory");
 
 const nameDialog = document.getElementById("nameDialog");
 const nameForm = document.getElementById("nameForm");
@@ -24,7 +21,6 @@ const studentPinInput = document.getElementById("studentPin");
 
 const statusDialog = document.getElementById("statusDialog");
 const statusForm = document.getElementById("statusForm");
-const confirmNameInput = document.getElementById("confirmName");
 const confirmPinInput = document.getElementById("confirmPin");
 const statusSelect = document.getElementById("statusSelect");
 const cancelBookingBtn = document.getElementById("cancelBookingBtn");
@@ -43,12 +39,12 @@ function validatePin(pin) {
   if (!pin || pin.length < 4 || pin.length > 6) {
     throw new Error("PIN 碼必須 4-6 位");
   }
-  const trimmed = pin.toLowerCase();
-  if (/^(.)\1+$/.test(trimmed)) {
-    throw new Error("PIN 碼不能是重複的字符（如 0000、aaaa）");
+  const normalized = pin.toLowerCase();
+  if (/^(.)\1+$/.test(normalized)) {
+    throw new Error("PIN 碼不能是重複字符（如 0000 / aaaa）");
   }
   if (!/^[a-z0-9]+$/i.test(pin)) {
-    throw new Error("PIN 碼只能用英文字母或數字");
+    throw new Error("PIN 碼只能是英文字母或數字");
   }
 }
 
@@ -56,28 +52,27 @@ function parseClassDateTime(classItem) {
   return new Date(`${classItem.date}T${classItem.startTime}:00`);
 }
 
-function splitUpcomingHistory(items) {
+function getUpcoming(items) {
   const now = new Date();
-  const upcoming = [];
-  const history = [];
-  for (const item of items) {
-    if (parseClassDateTime(item) >= now) {
-      upcoming.push(item);
-    } else {
-      history.push(item);
-    }
-  }
-  upcoming.sort((a, b) => parseClassDateTime(a) - parseClassDateTime(b));
-  history.sort((a, b) => parseClassDateTime(b) - parseClassDateTime(a));
-  return { upcoming, history };
+  return items
+    .filter((item) => parseClassDateTime(item) >= now)
+    .sort((a, b) => parseClassDateTime(a) - parseClassDateTime(b));
+}
+
+function logOperation(action, details) {
+  return addDoc(collection(db, "operations"), {
+    action,
+    details,
+    source: "student",
+    createdAt: Date.now(),
+  });
 }
 
 function classHeading(item) {
-  const levels = (item.levels || []).join(" + ");
   return `${item.date} ${item.startTime}-${item.endTime}`;
 }
 
-function classCard(item, isHistory) {
+function classCard(item) {
   const wrapper = document.createElement("article");
   wrapper.className = "card";
 
@@ -144,40 +139,31 @@ function classCard(item, isHistory) {
       name.textContent = `${i + 1}. ${value.name}`;
       seat.appendChild(name);
 
-      const pin = document.createElement("div");
-      pin.className = "status";
-      pin.textContent = `PIN: ${value.pin || "N/A"}`;
-      seat.appendChild(pin);
-
       const status = document.createElement("div");
       status.className = "status";
       status.textContent = value.status || STATUS_DEFAULT;
       seat.appendChild(status);
 
-      if (!isHistory) {
-        const btn = document.createElement("button");
-        btn.className = "button secondary";
-        btn.textContent = "更新狀態";
-        btn.addEventListener("click", () => {
-          openStatusDialog(item.id, i, value.name, value.status || STATUS_DEFAULT);
-        });
-        seat.appendChild(btn);
-      }
+      const btn = document.createElement("button");
+      btn.className = "button secondary";
+      btn.textContent = "更新狀態";
+      btn.addEventListener("click", () => {
+        openStatusDialog(item.id, i, value.status || STATUS_DEFAULT);
+      });
+      seat.appendChild(btn);
     } else {
       seat.classList.add("empty");
       const text = document.createElement("div");
       text.textContent = `${i + 1}. 空位`;
       seat.appendChild(text);
 
-      if (!isHistory) {
-        const btn = document.createElement("button");
-        btn.className = "button";
-        btn.textContent = "報名";
-        btn.addEventListener("click", () => {
-          openNameDialog(item.id, i);
-        });
-        seat.appendChild(btn);
-      }
+      const btn = document.createElement("button");
+      btn.className = "button";
+      btn.textContent = "報名";
+      btn.addEventListener("click", () => {
+        openNameDialog(item.id, i);
+      });
+      seat.appendChild(btn);
     }
 
     seatGrid.appendChild(seat);
@@ -188,16 +174,10 @@ function classCard(item, isHistory) {
 }
 
 function render() {
-  const { upcoming, history } = splitUpcomingHistory(classes);
-
+  const upcoming = getUpcoming(classes);
   upcomingContainer.innerHTML = "";
-  historyContainer.innerHTML = "";
-
   noUpcoming.classList.toggle("hidden", upcoming.length > 0);
-  noHistory.classList.toggle("hidden", history.length > 0);
-
-  upcoming.forEach((item) => upcomingContainer.appendChild(classCard(item, false)));
-  history.forEach((item) => historyContainer.appendChild(classCard(item, true)));
+  upcoming.forEach((item) => upcomingContainer.appendChild(classCard(item)));
 }
 
 function openNameDialog(classId, seatIndex) {
@@ -205,6 +185,7 @@ function openNameDialog(classId, seatIndex) {
   pendingSeatIndex = seatIndex;
   nameDialogTitle.textContent = `報名名額 ${seatIndex + 1}`;
   studentNameInput.value = "";
+  studentPinInput.value = "";
   nameDialog.showModal();
 }
 
@@ -219,8 +200,7 @@ async function signup(classId, seatIndex, studentName, studentPin) {
     const data = snap.data();
     const seats = Array.isArray(data.seats) ? [...data.seats] : Array(CLASS_CAPACITY).fill(null);
 
-    const duplicate = seats.find((s) => s && normalizeName(s.name) === normalizeName(studentName));
-    if (duplicate) {
+    if (seats.find((s) => s && normalizeName(s.name) === normalizeName(studentName))) {
       throw new Error("同一班期不可重覆報名");
     }
 
@@ -228,8 +208,7 @@ async function signup(classId, seatIndex, studentName, studentPin) {
       throw new Error("此名額已被佔用，請刷新後再試");
     }
 
-    const filledCount = seats.filter(Boolean).length;
-    if (filledCount >= CLASS_CAPACITY) {
+    if (seats.filter(Boolean).length >= CLASS_CAPACITY) {
       throw new Error("班期已滿額");
     }
 
@@ -245,21 +224,26 @@ async function signup(classId, seatIndex, studentName, studentPin) {
       updatedAt: Date.now(),
     });
   });
+
+  await logOperation("student_signup", {
+    classId,
+    seatIndex,
+    studentName,
+  });
 }
 
-function openStatusDialog(classId, seatIndex, name, status) {
+function openStatusDialog(classId, seatIndex, status) {
   activeStatusClassId = classId;
   activeStatusSeatIndex = seatIndex;
-  confirmNameInput.value = "";
-  confirmNameInput.placeholder = `輸入 ${name}`;
   confirmPinInput.value = "";
-  confirmPinInput.placeholder = "輸入你的 PIN 碼";
   statusSelect.value = status || STATUS_DEFAULT;
   statusDialog.showModal();
 }
 
-async function updateStatus(classId, seatIndex, confirmName, confirmPin, newStatus) {
+async function updateStatus(classId, seatIndex, confirmPin, newStatus) {
   const classRef = doc(db, "classes", classId);
+  let studentName = "";
+
   await runTransaction(db, async (transaction) => {
     const snap = await transaction.get(classRef);
     if (!snap.exists()) {
@@ -274,14 +258,11 @@ async function updateStatus(classId, seatIndex, confirmName, confirmPin, newStat
       throw new Error("找不到名額資料");
     }
 
-    if (normalizeName(seat.name) !== normalizeName(confirmName)) {
-      throw new Error("名字不一致，不能修改");
-    }
-
     if (seat.pin !== confirmPin) {
       throw new Error("PIN 碼錯誤，不能修改");
     }
 
+    studentName = seat.name;
     seat.status = newStatus;
     seat.updatedAt = Date.now();
     seats[seatIndex] = seat;
@@ -291,10 +272,19 @@ async function updateStatus(classId, seatIndex, confirmName, confirmPin, newStat
       updatedAt: Date.now(),
     });
   });
+
+  await logOperation("student_update_status", {
+    classId,
+    seatIndex,
+    studentName,
+    status: newStatus,
+  });
 }
 
-async function cancelBooking(classId, seatIndex, confirmName, confirmPin) {
+async function cancelBooking(classId, seatIndex, confirmPin) {
   const classRef = doc(db, "classes", classId);
+  let studentName = "";
+
   await runTransaction(db, async (transaction) => {
     const snap = await transaction.get(classRef);
     if (!snap.exists()) {
@@ -309,19 +299,22 @@ async function cancelBooking(classId, seatIndex, confirmName, confirmPin) {
       throw new Error("名額已是空位");
     }
 
-    if (normalizeName(seat.name) !== normalizeName(confirmName)) {
-      throw new Error("名字不一致，不能取消");
-    }
-
     if (seat.pin !== confirmPin) {
       throw new Error("PIN 碼錯誤，不能取消");
     }
 
+    studentName = seat.name;
     seats[seatIndex] = null;
     transaction.update(classRef, {
       seats,
       updatedAt: Date.now(),
     });
+  });
+
+  await logOperation("student_cancel_booking", {
+    classId,
+    seatIndex,
+    studentName,
   });
 }
 
@@ -356,13 +349,7 @@ statusForm.addEventListener("submit", async (event) => {
   }
 
   event.preventDefault();
-  const confirmName = normalizeName(confirmNameInput.value);
   const confirmPin = confirmPinInput.value;
-
-  if (!confirmName) {
-    alert("請輸入名字");
-    return;
-  }
 
   if (!confirmPin) {
     alert("請輸入 PIN 碼");
@@ -370,7 +357,7 @@ statusForm.addEventListener("submit", async (event) => {
   }
 
   try {
-    await updateStatus(activeStatusClassId, activeStatusSeatIndex, confirmName, confirmPin, statusSelect.value);
+    await updateStatus(activeStatusClassId, activeStatusSeatIndex, confirmPin, statusSelect.value);
     statusDialog.close();
   } catch (error) {
     alert(error.message || "更新失敗");
@@ -378,14 +365,7 @@ statusForm.addEventListener("submit", async (event) => {
 });
 
 cancelBookingBtn.addEventListener("click", async () => {
-  const confirmName = normalizeName(confirmNameInput.value);
   const confirmPin = confirmPinInput.value;
-
-  if (!confirmName) {
-    alert("請先輸入名字確認");
-    return;
-  }
-
   if (!confirmPin) {
     alert("請先輸入 PIN 碼");
     return;
@@ -396,7 +376,7 @@ cancelBookingBtn.addEventListener("click", async () => {
   }
 
   try {
-    await cancelBooking(activeStatusClassId, activeStatusSeatIndex, confirmName, confirmPin);
+    await cancelBooking(activeStatusClassId, activeStatusSeatIndex, confirmPin);
     statusDialog.close();
   } catch (error) {
     alert(error.message || "取消失敗");

@@ -47,6 +47,15 @@ function validateLevels(levels) {
   }
 }
 
+function logOperation(action, details) {
+  return addDoc(collection(db, "operations"), {
+    action,
+    details,
+    source: "admin",
+    createdAt: Date.now(),
+  });
+}
+
 function buildSongFields() {
   const current = selectedLevels();
   songFields.innerHTML = "";
@@ -63,7 +72,6 @@ function buildSongFields() {
     input.id = `song_${lv}`;
     input.maxLength = 100;
     input.required = true;
-    input.dataset.level = lv;
 
     wrap.appendChild(label);
     wrap.appendChild(input);
@@ -123,7 +131,6 @@ function fillForm(item) {
   });
 
   buildSongFields();
-
   (item.levels || []).forEach((lv) => {
     const input = document.getElementById(`song_${lv}`);
     if (input) {
@@ -165,41 +172,64 @@ async function saveClass(event) {
     const id = editingClassId.value;
     if (id) {
       await updateDoc(doc(db, "classes", id), payload);
+      await logOperation("admin_update_class", { classId: id, header: formatHeader(payload) });
       resetForm();
       return;
     }
 
-    await addDoc(collection(db, "classes"), {
+    const created = await addDoc(collection(db, "classes"), {
       ...payload,
       seats: Array(CLASS_CAPACITY).fill(null),
       createdAt: Date.now(),
     });
+    await logOperation("admin_create_class", { classId: created.id, header: formatHeader(payload) });
     resetForm();
   } catch (error) {
     alert(error.message || "儲存失敗");
   }
 }
 
+function doubleConfirm(first, second) {
+  if (!confirm(first)) {
+    return false;
+  }
+  return confirm(second);
+}
+
 async function removeClass(id) {
-  if (!confirm("確定刪除此班期？")) {
+  if (!doubleConfirm("確定刪除此班期？", "請再次確認：此動作無法復原，是否繼續？")) {
     return;
   }
   await deleteDoc(doc(db, "classes", id));
+  await logOperation("admin_delete_class", { classId: id });
   if (editingClassId.value === id) {
     resetForm();
   }
 }
 
 async function clearSeat(classId, index) {
+  if (!doubleConfirm("確定移除此報名人？", "請再次確認：要移除這位同學嗎？")) {
+    return;
+  }
+
   const target = classCache.find((x) => x.id === classId);
   if (!target) {
     return;
   }
+
   const seats = Array.isArray(target.seats) ? [...target.seats] : Array(CLASS_CAPACITY).fill(null);
+  const removedName = seats[index]?.name || "";
   seats[index] = null;
+
   await updateDoc(doc(db, "classes", classId), {
     seats,
     updatedAt: Date.now(),
+  });
+
+  await logOperation("admin_remove_student", {
+    classId,
+    seatIndex: index,
+    studentName: removedName,
   });
 }
 
@@ -297,7 +327,6 @@ function renderClassCard(item) {
   actions.appendChild(editBtn);
   actions.appendChild(deleteBtn);
   card.appendChild(actions);
-
   return card;
 }
 

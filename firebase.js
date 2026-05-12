@@ -9,10 +9,8 @@ import {
   getDoc,
   onSnapshot,
   runTransaction,
-  serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-// Replace with your Firebase project credentials.
 const firebaseConfig = {
   apiKey: "AIzaSyDqyeVGSWjd5vnVjhX5j2e89bkFPWuMKXg",
   authDomain: "hoop-class.firebaseapp.com",
@@ -35,5 +33,4 @@ export {
   getDoc,
   onSnapshot,
   runTransaction,
-  serverTimestamp,
 };
