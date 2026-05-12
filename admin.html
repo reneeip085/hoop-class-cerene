@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-HK">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Teacher Admin</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div>
+      <h1>Teacher Admin</h1>
+      <p class="muted">新增、編輯、刪除班期及管理名單</p>
+    </div>
+    <a class="button secondary" href="index.html">返回學生頁</a>
+  </header>
+
+  <main class="layout">
+    <section id="loginSection" class="card">
+      <h2>管理登入</h2>
+      <form id="loginForm" class="stack">
+        <label for="adminPassword">管理密碼</label>
+        <input type="password" id="adminPassword" required>
+        <button class="button" type="submit">登入</button>
+      </form>
+      <p class="muted">請在 admin.js 內更改預設密碼。</p>
+    </section>
+
+    <section id="adminSection" class="hidden">
+      <form id="classForm" class="card stack">
+        <h2 id="formTitle">新增班期</h2>
+        <input type="hidden" id="editingClassId">
+
+        <label for="date">日期</label>
+        <input type="date" id="date" required>
+
+        <div class="grid2">
+          <div>
+            <label for="startTime">開始時間</label>
+            <input type="time" id="startTime" required>
+          </div>
+          <div>
+            <label for="endTime">結束時間</label>
+            <input type="time" id="endTime" required>
+          </div>
+        </div>
+
+        <label for="location">地點</label>
+        <input id="location" maxlength="60" required>
+
+        <fieldset>
+          <legend>Level（可選 1-2 個）</legend>
+          <div class="inline-checks">
+            <label><input type="checkbox" name="levels" value="Lv0"> Lv0</label>
+            <label><input type="checkbox" name="levels" value="Lv1"> Lv1</label>
+            <label><input type="checkbox" name="levels" value="Lv2"> Lv2</label>
+          </div>
+        </fieldset>
+
+        <div id="songFields" class="stack"></div>
+
+        <div class="inline-buttons">
+          <button class="button" type="submit">儲存班期</button>
+          <button id="cancelEdit" class="button secondary hidden" type="button">取消編輯</button>
+        </div>
+      </form>
+
+      <section>
+        <h2>班期管理</h2>
+        <div id="adminClassList" class="cards"></div>
+      </section>
+    </section>
+  </main>
+
+  <script type="module" src="admin.js"></script>
+</body>
+</html>
