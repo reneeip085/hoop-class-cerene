@@ -18,9 +18,30 @@
   </header>
 
   <main class="layout">
+    <section class="card stack">
+      <h2>篩選</h2>
+      <label for="dateFilter">日期</label>
+      <input type="date" id="dateFilter">
+      <button id="clearDateFilter" class="button secondary" type="button">清除日期篩選</button>
+
+      <label for="actionFilter">操作類型</label>
+      <select id="actionFilter">
+        <option value="">所有操作</option>
+        <option value="student">學生操作</option>
+        <option value="admin">Admin 操作</option>
+      </select>
+    </section>
+
     <section>
       <h2>所有操作</h2>
-      <div id="operationList" class="cards"></div>
+      <div id="operationList"></div>
+
+      <div id="paginationControls" class="inline-buttons" style="margin-top: 20px;">
+        <button id="prevBtn" class="button secondary" type="button">← 上一頁</button>
+        <span id="pageInfo" class="muted"></span>
+        <button id="nextBtn" class="button secondary" type="button">下一頁 →</button>
+      </div>
+
       <p id="noOperation" class="muted hidden">暫時未有操作記錄。</p>
     </section>
   </main>
