@@ -1,4 +1,6 @@
 import {
+  auth,
+  onAuthStateChanged,
   db,
   collection,
   doc,
@@ -9,7 +11,6 @@ import {
 } from "./firebase.js";
 
 const CLASS_CAPACITY = 6;
-const ADMIN_AUTH_KEY = "cerence_admin_authed";
 
 const searchDateInput = document.getElementById("searchDate");
 const clearSearchBtn = document.getElementById("clearSearch");
@@ -19,11 +20,6 @@ const noClass = document.getElementById("noClass");
 
 let classCache = [];
 let sortAscending = true;
-
-if (sessionStorage.getItem(ADMIN_AUTH_KEY) !== "1") {
-  alert("請先在 Admin 頁面登入。");
-  window.location.href = "admin.html";
-}
 
 function classDate(item) {
   return new Date(`${item.date}T${item.startTime}:00`);
@@ -205,7 +201,15 @@ sortToggleBtn.addEventListener("click", () => {
   renderClasses();
 });
 
-onSnapshot(collection(db, "classes"), (snapshot) => {
-  classCache = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-  renderClasses();
+onAuthStateChanged(auth, (user) => {
+  if (!user) {
+    alert("請先在 Admin 頁面登入。");
+    window.location.href = "admin.html";
+    return;
+  }
+
+  onSnapshot(collection(db, "classes"), (snapshot) => {
+    classCache = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+    renderClasses();
+  });
 });

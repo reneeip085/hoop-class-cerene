@@ -1,4 +1,8 @@
 import {
+  auth,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
   db,
   collection,
   doc,
@@ -9,13 +13,14 @@ import {
 } from "./firebase.js";
 
 const CLASS_CAPACITY = 6;
-const ADMIN_PASSWORD = "61034467";
 const LEVELS = ["Lv0", "Lv1", "Lv2"];
 
 const loginSection = document.getElementById("loginSection");
 const adminSection = document.getElementById("adminSection");
 const loginForm = document.getElementById("loginForm");
+const adminEmailInput = document.getElementById("adminEmail");
 const adminPasswordInput = document.getElementById("adminPassword");
+const logoutBtn = document.getElementById("logoutBtn");
 
 const classForm = document.getElementById("classForm");
 const editingClassId = document.getElementById("editingClassId");
@@ -23,12 +28,15 @@ const formTitle = document.getElementById("formTitle");
 const cancelEditBtn = document.getElementById("cancelEdit");
 
 const dateInput = document.getElementById("date");
-const startTimeInput = document.getElementById("startTime");
-const endTimeInput = document.getElementById("endTime");
+const startHourInput = document.getElementById("startHour");
+const startMinuteInput = document.getElementById("startMinute");
+const endHourInput = document.getElementById("endHour");
+const endMinuteInput = document.getElementById("endMinute");
 const locationInput = document.getElementById("location");
 const levelInputs = [...document.querySelectorAll('input[name="levels"]')];
 const songFields = document.getElementById("songFields");
-const ADMIN_AUTH_KEY = "cerence_admin_authed";
+
+let isAdminReady = false;
 
 
 function selectedLevels() {
@@ -100,18 +108,28 @@ function formatClassHeader(dateStr, startTime, endTime) {
   return `${dayText} (${weekday}) ${startTime}-${endTime}`;
 }
 
-function populateTimeOptions(selectEl) {
-  selectEl.innerHTML = "";
+function toTimeString(hour, minute) {
+  return `${hour}:${minute}`;
+}
+
+function populateTimeOptions(hourSelectEl, minuteSelectEl) {
+  hourSelectEl.innerHTML = "";
+  minuteSelectEl.innerHTML = "";
+
   for (let hour = 0; hour < 24; hour += 1) {
-    for (let minute = 0; minute < 60; minute += 1) {
-      const hh = String(hour).padStart(2, "0");
-      const mm = String(minute).padStart(2, "0");
-      const value = `${hh}:${mm}`;
-      const option = document.createElement("option");
-      option.value = value;
-      option.textContent = value;
-      selectEl.appendChild(option);
-    }
+    const hh = String(hour).padStart(2, "0");
+    const option = document.createElement("option");
+    option.value = hh;
+    option.textContent = hh;
+    hourSelectEl.appendChild(option);
+  }
+
+  for (let minute = 0; minute < 60; minute += 1) {
+    const mm = String(minute).padStart(2, "0");
+    const option = document.createElement("option");
+    option.value = mm;
+    option.textContent = mm;
+    minuteSelectEl.appendChild(option);
   }
 }
 
@@ -143,8 +161,12 @@ function collectSongs(levels) {
 function fillForm(item) {
   editingClassId.value = item.id;
   dateInput.value = item.date;
-  startTimeInput.value = item.startTime;
-  endTimeInput.value = item.endTime;
+  const [startHour, startMinute] = (item.startTime || "00:00").split(":");
+  const [endHour, endMinute] = (item.endTime || "00:00").split(":");
+  startHourInput.value = startHour;
+  startMinuteInput.value = startMinute;
+  endHourInput.value = endHour;
+  endMinuteInput.value = endMinute;
   locationInput.value = item.location;
 
   levelInputs.forEach((input) => {
@@ -167,14 +189,21 @@ function fillForm(item) {
 async function saveClass(event) {
   event.preventDefault();
 
+  if (!isAdminReady) {
+    alert("請先登入 admin 帳號");
+    return;
+  }
+
   try {
+    const startTime = toTimeString(startHourInput.value, startMinuteInput.value);
+    const endTime = toTimeString(endHourInput.value, endMinuteInput.value);
     const levels = selectedLevels();
     validateLevels(levels);
 
     const payload = {
       date: dateInput.value,
-      startTime: startTimeInput.value,
-      endTime: endTimeInput.value,
+      startTime,
+      endTime,
       location: locationInput.value.trim(),
       levels,
       songs: collectSongs(levels),
@@ -223,18 +252,38 @@ levelInputs.forEach((x) => x.addEventListener("change", () => {
 cancelEditBtn.addEventListener("click", resetForm);
 classForm.addEventListener("submit", saveClass);
 
-loginForm.addEventListener("submit", (event) => {
+loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (adminPasswordInput.value !== ADMIN_PASSWORD) {
-    alert("密碼錯誤");
+
+  const email = adminEmailInput.value.trim();
+  const password = adminPasswordInput.value;
+  if (!email || !password) {
+    alert("請輸入 Email 和 Password");
     return;
   }
 
-  sessionStorage.setItem(ADMIN_AUTH_KEY, "1");
-  loginSection.classList.add("hidden");
-  adminSection.classList.remove("hidden");
+  try {
+    await signInWithEmailAndPassword(auth, email, password);
+  } catch (error) {
+    alert(error.message || "登入失敗");
+  }
 });
 
-populateTimeOptions(startTimeInput);
-populateTimeOptions(endTimeInput);
+logoutBtn.addEventListener("click", async () => {
+  try {
+    await signOut(auth);
+  } catch (error) {
+    alert(error.message || "登出失敗");
+  }
+});
+
+onAuthStateChanged(auth, (user) => {
+  isAdminReady = !!user;
+  loginSection.classList.toggle("hidden", !!user);
+  adminSection.classList.toggle("hidden", !user);
+  logoutBtn.classList.toggle("hidden", !user);
+});
+
+populateTimeOptions(startHourInput, startMinuteInput);
+populateTimeOptions(endHourInput, endMinuteInput);
 buildSongFields();

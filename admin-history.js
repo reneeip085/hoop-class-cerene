@@ -1,6 +1,5 @@
-import { db, collection, onSnapshot } from "./firebase.js";
+import { auth, onAuthStateChanged, db, collection, onSnapshot } from "./firebase.js";
 
-const ADMIN_AUTH_KEY = "cerence_admin_authed";
 const operationList = document.getElementById("operationList");
 const noOperation = document.getElementById("noOperation");
 
@@ -53,14 +52,17 @@ function render() {
   operations.forEach((op) => operationList.appendChild(renderRow(op)));
 }
 
-onSnapshot(collection(db, "operations"), (snapshot) => {
-  operations = snapshot.docs
-    .map((d) => ({ id: d.id, ...d.data() }))
-    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-  render();
-});
+onAuthStateChanged(auth, (user) => {
+  if (!user) {
+    alert("請先在 Admin 頁面登入。");
+    window.location.href = "admin.html";
+    return;
+  }
 
-if (sessionStorage.getItem(ADMIN_AUTH_KEY) !== "1") {
-  alert("請先在 Admin 頁面登入。");
-  window.location.href = "admin.html";
-}
+  onSnapshot(collection(db, "operations"), (snapshot) => {
+    operations = snapshot.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    render();
+  });
+});
