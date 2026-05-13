@@ -44,8 +44,8 @@ function selectedLevels() {
 }
 
 function validateLevels(levels) {
-  if (levels.length < 1 || levels.length > 2) {
-    throw new Error("每個班期必須選 1-2 個 Level");
+  if (levels.length < 1) {
+    throw new Error("每個班期必須選至少 1 個 Level");
   }
   for (const lv of levels) {
     if (!LEVELS.includes(lv)) {
@@ -241,11 +241,6 @@ async function saveClass(event) {
 
 
 levelInputs.forEach((x) => x.addEventListener("change", () => {
-  const levels = selectedLevels();
-  if (levels.length > 2) {
-    x.checked = false;
-    alert("最多只可選 2 個 Level");
-  }
   buildSongFields();
 }));
 
