@@ -23,6 +23,8 @@ const statusDialog = document.getElementById("statusDialog");
 const statusForm = document.getElementById("statusForm");
 const confirmPinInput = document.getElementById("confirmPin");
 const statusSelect = document.getElementById("statusSelect");
+const depositDateWrap = document.getElementById("depositDateWrap");
+const depositDateInput = document.getElementById("depositDateInput");
 const cancelBookingBtn = document.getElementById("cancelBookingBtn");
 
 let classes = [];
@@ -81,6 +83,28 @@ function logOperation(action, details) {
 
 function classHeading(item) {
   return formatClassHeader(item.date, item.startTime, item.endTime);
+}
+
+function isPaidStatus(status) {
+  return status === "已付留位費 ✅";
+}
+
+function formatSeatStatus(seat) {
+  if (!seat) {
+    return STATUS_DEFAULT;
+  }
+  if (isPaidStatus(seat.status) && seat.depositDate) {
+    return `${seat.status}（${seat.depositDate}）`;
+  }
+  return seat.status || STATUS_DEFAULT;
+}
+
+function syncDepositDateField() {
+  const show = isPaidStatus(statusSelect.value);
+  depositDateWrap.classList.toggle("hidden", !show);
+  if (!show) {
+    depositDateInput.value = "";
+  }
 }
 
 function classCard(item) {
@@ -152,14 +176,14 @@ function classCard(item) {
 
       const status = document.createElement("div");
       status.className = "status";
-      status.textContent = value.status || STATUS_DEFAULT;
+      status.textContent = formatSeatStatus(value);
       seat.appendChild(status);
 
       const btn = document.createElement("button");
       btn.className = "button secondary";
       btn.textContent = "更新狀態";
       btn.addEventListener("click", () => {
-        openStatusDialog(item.id, i, value.status || STATUS_DEFAULT);
+        openStatusDialog(item.id, i, value.status || STATUS_DEFAULT, value.depositDate || "");
       });
       seat.appendChild(btn);
     } else {
@@ -243,15 +267,17 @@ async function signup(classId, seatIndex, studentName, studentPin) {
   });
 }
 
-function openStatusDialog(classId, seatIndex, status) {
+function openStatusDialog(classId, seatIndex, status, depositDate) {
   activeStatusClassId = classId;
   activeStatusSeatIndex = seatIndex;
   confirmPinInput.value = "";
   statusSelect.value = status || STATUS_DEFAULT;
+  depositDateInput.value = depositDate || "";
+  syncDepositDateField();
   statusDialog.showModal();
 }
 
-async function updateStatus(classId, seatIndex, confirmPin, newStatus) {
+async function updateStatus(classId, seatIndex, confirmPin, newStatus, depositDate) {
   const classRef = doc(db, "classes", classId);
   let studentName = "";
 
@@ -275,6 +301,7 @@ async function updateStatus(classId, seatIndex, confirmPin, newStatus) {
 
     studentName = seat.name;
     seat.status = newStatus;
+    seat.depositDate = isPaidStatus(newStatus) ? (depositDate || "") : "";
     seat.updatedAt = Date.now();
     seats[seatIndex] = seat;
 
@@ -289,6 +316,7 @@ async function updateStatus(classId, seatIndex, confirmPin, newStatus) {
     seatIndex,
     studentName,
     status: newStatus,
+    depositDate: isPaidStatus(newStatus) ? (depositDate || "") : "",
   });
 }
 
@@ -361,6 +389,7 @@ statusForm.addEventListener("submit", async (event) => {
 
   event.preventDefault();
   const confirmPin = confirmPinInput.value;
+  const depositDate = depositDateInput.value;
 
   if (!confirmPin) {
     alert("請輸入 PIN 碼");
@@ -368,12 +397,20 @@ statusForm.addEventListener("submit", async (event) => {
   }
 
   try {
-    await updateStatus(activeStatusClassId, activeStatusSeatIndex, confirmPin, statusSelect.value);
+    await updateStatus(
+      activeStatusClassId,
+      activeStatusSeatIndex,
+      confirmPin,
+      statusSelect.value,
+      depositDate,
+    );
     statusDialog.close();
   } catch (error) {
     alert(error.message || "更新失敗");
   }
 });
+
+statusSelect.addEventListener("change", syncDepositDateField);
 
 cancelBookingBtn.addEventListener("click", async () => {
   const confirmPin = confirmPinInput.value;
