@@ -49,7 +49,9 @@ function formatDetailText(action, details) {
   let text = "";
 
   if (action === "student_signup") {
-    text = `學生: ${details.studentName || "--"} | 班期: ${details.classId || "--"}`;
+    const classInfo = details.classHeader || "";
+    const levelsInfo = details.levels ? ` ${details.levels}` : "";
+    text = `學生: ${details.studentName || "--"} | 班期: ${classInfo}${levelsInfo}`;
   } else if (action === "student_update_status") {
     text = `學生: ${details.studentName || "--"} | 狀態: ${details.status || "--"}`;
   } else if (action === "student_cancel_booking") {

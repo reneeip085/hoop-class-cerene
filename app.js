@@ -226,6 +226,8 @@ function openNameDialog(classId, seatIndex) {
 
 async function signup(classId, seatIndex, studentName, studentPin) {
   const classRef = doc(db, "classes", classId);
+  let classData = null;
+
   await runTransaction(db, async (transaction) => {
     const snap = await transaction.get(classRef);
     if (!snap.exists()) {
@@ -233,6 +235,7 @@ async function signup(classId, seatIndex, studentName, studentPin) {
     }
 
     const data = snap.data();
+    classData = data;
     const seats = Array.isArray(data.seats) ? [...data.seats] : Array(CLASS_CAPACITY).fill(null);
 
     if (seats.find((s) => s && normalizeName(s.name) === normalizeName(studentName))) {
@@ -264,6 +267,8 @@ async function signup(classId, seatIndex, studentName, studentPin) {
     classId,
     seatIndex,
     studentName,
+    classHeader: classData ? formatClassHeader(classData.date, classData.startTime, classData.endTime) : "",
+    levels: classData ? (classData.levels || []).join(", ") : "",
   });
 }
 
