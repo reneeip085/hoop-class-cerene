@@ -215,6 +215,28 @@ function render() {
   upcoming.forEach((item) => upcomingContainer.appendChild(classCard(item)));
 }
 
+function applyLocalSeatPatch(classId, patchFn) {
+  let changed = false;
+  classes = classes.map((item) => {
+    if (item.id !== classId) {
+      return item;
+    }
+
+    const seats = Array.isArray(item.seats) ? [...item.seats] : Array(CLASS_CAPACITY).fill(null);
+    patchFn(seats);
+    changed = true;
+    return {
+      ...item,
+      seats,
+      updatedAt: Date.now(),
+    };
+  });
+
+  if (changed) {
+    render();
+  }
+}
+
 function openNameDialog(classId, seatIndex) {
   pendingSignupClassId = classId;
   pendingSeatIndex = seatIndex;
@@ -380,6 +402,14 @@ nameForm.addEventListener("submit", async (event) => {
   try {
     validatePin(studentPin);
     await signup(pendingSignupClassId, pendingSeatIndex, studentName, studentPin);
+    applyLocalSeatPatch(pendingSignupClassId, (seats) => {
+      seats[pendingSeatIndex] = {
+        name: studentName,
+        pin: studentPin,
+        status: STATUS_DEFAULT,
+        updatedAt: Date.now(),
+      };
+    });
     nameDialog.close();
   } catch (error) {
     alert(error.message || "報名失敗");
@@ -409,6 +439,15 @@ statusForm.addEventListener("submit", async (event) => {
       statusSelect.value,
       depositDate,
     );
+    applyLocalSeatPatch(activeStatusClassId, (seats) => {
+      const current = seats[activeStatusSeatIndex] || {};
+      seats[activeStatusSeatIndex] = {
+        ...current,
+        status: statusSelect.value,
+        depositDate: isPaidStatus(statusSelect.value) ? (depositDate || "") : "",
+        updatedAt: Date.now(),
+      };
+    });
     statusDialog.close();
   } catch (error) {
     alert(error.message || "更新失敗");
@@ -430,6 +469,9 @@ cancelBookingBtn.addEventListener("click", async () => {
 
   try {
     await cancelBooking(activeStatusClassId, activeStatusSeatIndex, confirmPin);
+    applyLocalSeatPatch(activeStatusClassId, (seats) => {
+      seats[activeStatusSeatIndex] = null;
+    });
     statusDialog.close();
   } catch (error) {
     alert(error.message || "取消失敗");
