@@ -204,6 +204,21 @@ input, select {
   color: var(--ok);
 }
 
+.app-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  background: #111827;
+  color: #fff;
+  padding: 10px 14px;
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  z-index: 100;
+  font-size: 14px;
+  max-width: min(92vw, 520px);
+}
+
 dialog {
   border: none;
   border-radius: 14px;

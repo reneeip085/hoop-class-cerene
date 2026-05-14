@@ -27,12 +27,28 @@ const paymentMethodWrap = document.getElementById("paymentMethodWrap");
 const paymentMethodInput = document.getElementById("paymentMethodInput");
 const cancelBookingBtn = document.getElementById("cancelBookingBtn");
 const saveStatusBtn = document.getElementById("saveStatusBtn");
+const appToast = document.getElementById("appToast");
 
 let classes = [];
 let pendingSignupClassId = null;
 let activeStatusClassId = null;
 let activeStatusIndex = null;
 let activeStatusType = "seat";
+let toastTimer = null;
+
+function showToast(message) {
+  if (!appToast) {
+    return;
+  }
+  appToast.textContent = message;
+  appToast.classList.remove("hidden");
+  if (toastTimer) {
+    clearTimeout(toastTimer);
+  }
+  toastTimer = setTimeout(() => {
+    appToast.classList.add("hidden");
+  }, 2600);
+}
 
 function normalizeName(name) {
   return name.trim().replace(/\s+/g, " ");
@@ -51,17 +67,37 @@ function validatePin(pin) {
   }
 }
 
-function parseClassDateTime(classItem) {
-  const datePart = classItem?.date || "";
-  const timePart = classItem?.startTime || "00:00";
-  const value = new Date(`${datePart}T${timePart}:00`);
-
-  if (!Number.isNaN(value.getTime())) {
-    return value;
+function parseDateParts(dateStr) {
+  const m = String(dateStr || "").match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (!m) {
+    return null;
   }
+  return {
+    year: Number(m[1]),
+    month: Number(m[2]),
+    day: Number(m[3]),
+  };
+}
 
-  // Fallback: treat malformed time as start-of-day so future classes are not hidden.
-  return new Date(`${datePart}T00:00:00`);
+function parseTimeParts(timeStr) {
+  const m = String(timeStr || "00:00").match(/^(\d{1,2}):(\d{1,2})$/);
+  if (!m) {
+    return { hour: 0, minute: 0, valid: false };
+  }
+  return {
+    hour: Number(m[1]),
+    minute: Number(m[2]),
+    valid: true,
+  };
+}
+
+function parseClassDateTime(classItem) {
+  const date = parseDateParts(classItem?.date);
+  if (!date) {
+    return new Date(NaN);
+  }
+  const time = parseTimeParts(classItem?.startTime);
+  return new Date(date.year, date.month - 1, date.day, time.hour, time.minute, 0, 0);
 }
 
 function isWithin24Hours(classItem) {
@@ -70,7 +106,10 @@ function isWithin24Hours(classItem) {
 }
 
 function formatClassHeader(dateStr, startTime, endTime) {
-  const dateObj = new Date(`${dateStr}T00:00:00`);
+  const date = parseDateParts(dateStr);
+  const dateObj = date
+    ? new Date(date.year, date.month - 1, date.day, 0, 0, 0, 0)
+    : new Date(NaN);
   const dayText = dateObj.toLocaleDateString("en-GB", {
     day: "2-digit",
     month: "short",
@@ -92,10 +131,11 @@ function getUpcoming(items) {
       }
 
       // Last-resort fallback by date only.
-      const d = new Date(`${item?.date || ""}T00:00:00`);
-      if (Number.isNaN(d.getTime())) {
+      const parsedDate = parseDateParts(item?.date);
+      if (!parsedDate) {
         return false;
       }
+      const d = new Date(parsedDate.year, parsedDate.month - 1, parsedDate.day, 0, 0, 0, 0);
       return d >= today;
     })
     .sort((a, b) => parseClassDateTime(a) - parseClassDateTime(b));
@@ -127,6 +167,29 @@ function formatSeatStatus(seat) {
 function normalizeSeats(seats) {
   const taken = seats.filter(Boolean);
   return [...taken, ...Array(CLASS_CAPACITY - taken.length).fill(null)];
+}
+
+function normalizeWaitlist(waitlist) {
+  const list = Array.isArray(waitlist) ? [...waitlist] : [];
+  const keyed = list
+    .filter((x) => x && x.name)
+    .map((x, idx) => ({
+      ...x,
+      joinedAt: typeof x.joinedAt === "number" ? x.joinedAt : (Date.now() + idx),
+    }))
+    .sort((a, b) => a.joinedAt - b.joinedAt);
+
+  const seen = new Set();
+  const deduped = [];
+  keyed.forEach((x) => {
+    const key = normalizeName(x.name).toLowerCase();
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    deduped.push(x);
+  });
+  return deduped;
 }
 
 function classCard(item) {
@@ -174,7 +237,7 @@ function classCard(item) {
   wrapper.appendChild(songs);
 
   const seats = normalizeSeats(Array.isArray(item.seats) ? item.seats : []);
-  const waitlist = Array.isArray(item.waitlist) ? item.waitlist : [];
+  const waitlist = normalizeWaitlist(item.waitlist);
   const used = seats.filter(Boolean).length;
   const remain = CLASS_CAPACITY - used;
   const locked = isWithin24Hours(item);
@@ -304,7 +367,7 @@ function applyLocalClassPatch(classId, patchFn) {
     const clone = {
       ...item,
       seats: Array.isArray(item.seats) ? [...item.seats] : Array(CLASS_CAPACITY).fill(null),
-      waitlist: Array.isArray(item.waitlist) ? [...item.waitlist] : [],
+      waitlist: normalizeWaitlist(item.waitlist),
     };
     patchFn(clone);
     changed = true;
@@ -341,13 +404,13 @@ async function signup(classId, studentName, studentPin) {
     const data = snap.data();
     classData = data;
     const seats = normalizeSeats(Array.isArray(data.seats) ? [...data.seats] : Array(CLASS_CAPACITY).fill(null));
-    const waitlist = Array.isArray(data.waitlist) ? [...data.waitlist] : [];
+    const waitlist = normalizeWaitlist(data.waitlist);
 
     if (seats.find((s) => s && normalizeName(s.name) === normalizeName(studentName))) {
       throw new Error("同一班期不可重覆報名");
     }
 
-    if (waitlist.find((w) => normalizeName(w.name) === normalizeName(studentName))) {
+    if (waitlist.find((w) => normalizeName(w.name).toLowerCase() === normalizeName(studentName).toLowerCase())) {
       throw new Error("你已在等候名單中");
     }
 
@@ -485,7 +548,7 @@ async function cancelEntry(classId, type, index, confirmPin) {
     }
 
     const seats = normalizeSeats(Array.isArray(data.seats) ? [...data.seats] : []);
-    const waitlist = Array.isArray(data.waitlist) ? [...data.waitlist] : [];
+    const waitlist = normalizeWaitlist(data.waitlist);
 
     if (type === "seat") {
       const seat = seats[index];
@@ -585,7 +648,7 @@ nameForm.addEventListener("submit", async (event) => {
     const result = await signup(pendingSignupClassId, studentName, studentPin);
     applyLocalClassPatch(pendingSignupClassId, (item) => {
       item.seats = normalizeSeats(item.seats || []);
-      item.waitlist = Array.isArray(item.waitlist) ? item.waitlist : [];
+      item.waitlist = normalizeWaitlist(item.waitlist || []);
 
       if (result.mode === "seat") {
         item.seats[result.seatIndex] = {
@@ -596,16 +659,10 @@ nameForm.addEventListener("submit", async (event) => {
         };
         return;
       }
-
-      item.waitlist.push({
-        name: studentName,
-        pin: studentPin,
-        joinedAt: Date.now(),
-      });
     });
 
     if (result.mode === "waitlist") {
-      alert(`班期已滿，已加入等候名單（第 ${result.waitlistPosition} 位）。`);
+      showToast(`班期已滿，已加入等候名單（第 ${result.waitlistPosition} 位）。`);
     }
     nameDialog.close();
   } catch (error) {
@@ -670,7 +727,7 @@ cancelBookingBtn.addEventListener("click", async () => {
     await cancelEntry(activeStatusClassId, activeStatusType, activeStatusIndex, confirmPin);
     applyLocalClassPatch(activeStatusClassId, (item) => {
       item.seats = normalizeSeats(item.seats || []);
-      item.waitlist = Array.isArray(item.waitlist) ? item.waitlist : [];
+      item.waitlist = normalizeWaitlist(item.waitlist || []);
 
       if (activeStatusType === "seat") {
         item.seats[activeStatusIndex] = null;
@@ -699,7 +756,14 @@ cancelBookingBtn.addEventListener("click", async () => {
   }
 });
 
-onSnapshot(collection(db, "classes"), (snapshot) => {
-  classes = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-  render();
-});
+onSnapshot(
+  collection(db, "classes"),
+  (snapshot) => {
+    classes = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+    render();
+  },
+  (error) => {
+    console.error("讀取班期失敗", error);
+    alert("讀取班期失敗，請稍後再試或聯絡老師。\n" + (error?.message || ""));
+  },
+);
