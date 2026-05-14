@@ -3,6 +3,7 @@ import {
   collection,
   doc,
   addDoc,
+  getDoc,
   onSnapshot,
   runTransaction,
 } from "./firebase.js";
@@ -357,28 +358,29 @@ function render() {
   upcoming.forEach((item) => upcomingContainer.appendChild(classCard(item)));
 }
 
-function applyLocalClassPatch(classId, patchFn) {
-  let changed = false;
-  classes = classes.map((item) => {
-    if (item.id !== classId) {
-      return item;
+async function refreshClassFromServer(classId) {
+  try {
+    const snap = await getDoc(doc(db, "classes", classId));
+    if (!snap.exists()) {
+      return;
     }
 
-    const clone = {
-      ...item,
-      seats: Array.isArray(item.seats) ? [...item.seats] : Array(CLASS_CAPACITY).fill(null),
-      waitlist: normalizeWaitlist(item.waitlist),
-    };
-    patchFn(clone);
-    changed = true;
-    return {
-      ...clone,
-      updatedAt: Date.now(),
-    };
-  });
+    const fresh = { id: snap.id, ...snap.data() };
+    let replaced = false;
+    classes = classes.map((item) => {
+      if (item.id !== classId) {
+        return item;
+      }
+      replaced = true;
+      return fresh;
+    });
 
-  if (changed) {
+    if (!replaced) {
+      classes.push(fresh);
+    }
     render();
+  } catch (error) {
+    console.error("刷新班期資料失敗", error);
   }
 }
 
@@ -646,20 +648,7 @@ nameForm.addEventListener("submit", async (event) => {
   try {
     validatePin(studentPin);
     const result = await signup(pendingSignupClassId, studentName, studentPin);
-    applyLocalClassPatch(pendingSignupClassId, (item) => {
-      item.seats = normalizeSeats(item.seats || []);
-      item.waitlist = normalizeWaitlist(item.waitlist || []);
-
-      if (result.mode === "seat") {
-        item.seats[result.seatIndex] = {
-          name: studentName,
-          pin: studentPin,
-          paymentMethod: "",
-          updatedAt: Date.now(),
-        };
-        return;
-      }
-    });
+    await refreshClassFromServer(pendingSignupClassId);
 
     if (result.mode === "waitlist") {
       showToast(`班期已滿，已加入等候名單（第 ${result.waitlistPosition} 位）。`);
@@ -696,15 +685,7 @@ statusForm.addEventListener("submit", async (event) => {
       confirmPin,
       paymentMethod,
     );
-    applyLocalClassPatch(activeStatusClassId, (item) => {
-      item.seats = normalizeSeats(item.seats || []);
-      const current = item.seats[activeStatusIndex] || {};
-      item.seats[activeStatusIndex] = {
-        ...current,
-        paymentMethod,
-        updatedAt: Date.now(),
-      };
-    });
+    await refreshClassFromServer(activeStatusClassId);
     statusDialog.close();
   } catch (error) {
     alert(error.message || "更新失敗");
@@ -725,31 +706,7 @@ cancelBookingBtn.addEventListener("click", async () => {
 
   try {
     await cancelEntry(activeStatusClassId, activeStatusType, activeStatusIndex, confirmPin);
-    applyLocalClassPatch(activeStatusClassId, (item) => {
-      item.seats = normalizeSeats(item.seats || []);
-      item.waitlist = normalizeWaitlist(item.waitlist || []);
-
-      if (activeStatusType === "seat") {
-        item.seats[activeStatusIndex] = null;
-        item.seats = normalizeSeats(item.seats);
-        if (item.waitlist.length > 0) {
-          const promoted = item.waitlist.shift();
-          const empty = item.seats.findIndex((x) => !x);
-          if (empty >= 0) {
-            item.seats[empty] = {
-              name: promoted.name,
-              pin: promoted.pin,
-              paymentMethod: "",
-              fromWaitlistAt: Date.now(),
-              updatedAt: Date.now(),
-            };
-          }
-        }
-        return;
-      }
-
-      item.waitlist.splice(activeStatusIndex, 1);
-    });
+    await refreshClassFromServer(activeStatusClassId);
     statusDialog.close();
   } catch (error) {
     alert(error.message || "取消失敗");
