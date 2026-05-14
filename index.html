@@ -26,6 +26,17 @@
 
   <div id="appToast" class="app-toast hidden" role="status" aria-live="polite"></div>
 
+  <dialog id="confirmDialog">
+    <form method="dialog" class="dialog-form" id="confirmForm">
+      <h3 id="confirmTitle">請確認</h3>
+      <p id="confirmMessage" class="muted">確定繼續？</p>
+      <menu>
+        <button value="cancel" class="button secondary" formnovalidate>取消</button>
+        <button value="confirm" class="button">確認</button>
+      </menu>
+    </form>
+  </dialog>
+
   <dialog id="nameDialog">
     <form method="dialog" id="nameForm" class="dialog-form">
       <h3 id="nameDialogTitle">報名</h3>

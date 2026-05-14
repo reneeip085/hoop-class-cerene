@@ -29,6 +29,10 @@ const paymentMethodInput = document.getElementById("paymentMethodInput");
 const cancelBookingBtn = document.getElementById("cancelBookingBtn");
 const saveStatusBtn = document.getElementById("saveStatusBtn");
 const appToast = document.getElementById("appToast");
+const confirmDialog = document.getElementById("confirmDialog");
+const confirmTitle = document.getElementById("confirmTitle");
+const confirmMessage = document.getElementById("confirmMessage");
+const confirmForm = document.getElementById("confirmForm");
 
 let classes = [];
 let pendingSignupClassId = null;
@@ -49,6 +53,25 @@ function showToast(message) {
   toastTimer = setTimeout(() => {
     appToast.classList.add("hidden");
   }, 2600);
+}
+
+function askConfirm(message, title = "請確認") {
+  if (!confirmDialog || !confirmForm) {
+    return Promise.resolve(false);
+  }
+
+  confirmTitle.textContent = title;
+  confirmMessage.textContent = message;
+
+  return new Promise((resolve) => {
+    const onSubmit = (event) => {
+      const action = event.submitter?.value;
+      resolve(action === "confirm");
+    };
+
+    confirmForm.addEventListener("submit", onSubmit, { once: true });
+    confirmDialog.showModal();
+  });
 }
 
 function normalizeName(name) {
@@ -282,11 +305,12 @@ function classCard(item) {
       const btn = document.createElement("button");
       btn.className = "button secondary";
       btn.textContent = "更新資料";
-      btn.disabled = locked;
-      btn.addEventListener("click", () => {
-        openStatusDialog(item.id, "seat", i, value.paymentMethod || "");
-      });
-      seat.appendChild(btn);
+      if (!locked) {
+        btn.addEventListener("click", () => {
+          openStatusDialog(item.id, "seat", i, value.paymentMethod || "");
+        });
+        seat.appendChild(btn);
+      }
     } else {
       seat.classList.add("empty");
       const text = document.createElement("div");
@@ -641,7 +665,7 @@ nameForm.addEventListener("submit", async (event) => {
   const studentPin = studentPinInput.value;
 
   if (!studentName) {
-    alert("請輸入名字");
+    showToast("請輸入名字");
     return;
   }
 
@@ -655,7 +679,7 @@ nameForm.addEventListener("submit", async (event) => {
     }
     nameDialog.close();
   } catch (error) {
-    alert(error.message || "報名失敗");
+    showToast(error.message || "報名失敗");
   }
 });
 
@@ -674,7 +698,7 @@ statusForm.addEventListener("submit", async (event) => {
   const paymentMethod = paymentMethodInput.value.trim();
 
   if (!confirmPin) {
-    alert("請輸入 PIN 碼");
+    showToast("請輸入 PIN 碼");
     return;
   }
 
@@ -688,19 +712,19 @@ statusForm.addEventListener("submit", async (event) => {
     await refreshClassFromServer(activeStatusClassId);
     statusDialog.close();
   } catch (error) {
-    alert(error.message || "更新失敗");
+    showToast(error.message || "更新失敗");
   }
 });
 
 cancelBookingBtn.addEventListener("click", async () => {
   const confirmPin = confirmPinInput.value;
   if (!confirmPin) {
-    alert("請先輸入 PIN 碼");
+    showToast("請先輸入 PIN 碼");
     return;
   }
 
   const confirmText = activeStatusType === "waitlist" ? "確定取消等候？" : "確定取消報名？";
-  if (!confirm(confirmText)) {
+  if (!(await askConfirm(confirmText))) {
     return;
   }
 
@@ -709,7 +733,7 @@ cancelBookingBtn.addEventListener("click", async () => {
     await refreshClassFromServer(activeStatusClassId);
     statusDialog.close();
   } catch (error) {
-    alert(error.message || "取消失敗");
+    showToast(error.message || "取消失敗");
   }
 });
 
@@ -721,6 +745,6 @@ onSnapshot(
   },
   (error) => {
     console.error("讀取班期失敗", error);
-    alert("讀取班期失敗，請稍後再試或聯絡老師。\n" + (error?.message || ""));
+    showToast("讀取班期失敗，請稍後再試或聯絡老師。");
   },
 );
