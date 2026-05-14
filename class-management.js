@@ -148,7 +148,7 @@ function renderClassCard(item) {
 
       const st = document.createElement("div");
       st.className = "status";
-      st.textContent = value.status || "未付留位費";
+      st.textContent = value.paymentMethod ? `付款方式：${value.paymentMethod}` : (value.status || "未填付款方式");
       seat.appendChild(st);
 
       const clearBtn = document.createElement("button");

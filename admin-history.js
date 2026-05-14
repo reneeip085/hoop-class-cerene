@@ -11,8 +11,11 @@ const pageInfo = document.getElementById("pageInfo");
 
 const ACTION_LABELS = {
   student_signup: "學生報名",
-  student_update_status: "學生更新狀態",
+  student_update_status: "學生更新付款方式",
   student_cancel_booking: "學生取消報名",
+  student_join_waitlist: "學生加入等候名單",
+  student_cancel_waitlist: "學生取消等候",
+  student_promote_from_waitlist: "等候名單自動升位",
   admin_create_class: "Admin 新增班期",
   admin_update_class: "Admin 編輯班期",
   admin_delete_class: "Admin 刪除班期",
@@ -53,8 +56,14 @@ function formatDetailText(action, details) {
     const levelsInfo = details.levels ? ` ${details.levels}` : "";
     text = `學生: ${details.studentName || "--"} | 班期: ${classInfo}${levelsInfo}`;
   } else if (action === "student_update_status") {
-    text = `學生: ${details.studentName || "--"} | 狀態: ${details.status || "--"}`;
+    text = `學生: ${details.studentName || "--"} | 付款方式: ${details.paymentMethod || "--"}`;
   } else if (action === "student_cancel_booking") {
+    text = `學生: ${details.studentName || "--"}${details.promotedName ? ` | 已升位: ${details.promotedName}` : ""}`;
+  } else if (action === "student_join_waitlist") {
+    text = `學生: ${details.studentName || "--"} | 等候位置: ${details.waitlistPosition || "--"}`;
+  } else if (action === "student_cancel_waitlist") {
+    text = `學生: ${details.studentName || "--"}`;
+  } else if (action === "student_promote_from_waitlist") {
     text = `學生: ${details.studentName || "--"}`;
   } else if (action === "admin_create_class") {
     text = `班期: ${details.header || "--"}`;

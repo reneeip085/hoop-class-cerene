@@ -42,25 +42,19 @@
 
   <dialog id="statusDialog">
     <form method="dialog" id="statusForm" class="dialog-form">
-      <h3>更新狀態</h3>
+      <h3 id="statusDialogTitle">更新資料</h3>
       <label for="confirmPin">請輸入你的 PIN 碼</label>
       <input id="confirmPin" maxlength="6" required placeholder="e.g. 1234">
 
-      <label for="statusSelect">報名狀態</label>
-      <select id="statusSelect" required>
-        <option value="未付留位費">未付留位費</option>
-        <option value="已付留位費 ✅">已付留位費 ✅</option>
-      </select>
-
-      <div id="depositDateWrap" class="hidden">
-        <label for="depositDateInput">已付留位費日期</label>
-        <input id="depositDateInput" type="date" placeholder="YYYY-MM-DD">
+      <div id="paymentMethodWrap">
+        <label for="paymentMethodInput">付款方式</label>
+        <input id="paymentMethodInput" maxlength="60" placeholder="可自由輸入，例如：FPS / 現金 / 轉數快">
       </div>
 
       <menu>
         <button type="button" id="cancelBookingBtn" class="button danger">取消報名</button>
         <button value="dismiss" class="button secondary" formnovalidate>關閉</button>
-        <button value="save" class="button">儲存</button>
+        <button id="saveStatusBtn" value="save" class="button">儲存</button>
       </menu>
     </form>
   </dialog>

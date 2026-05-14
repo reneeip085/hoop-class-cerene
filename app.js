@@ -152,6 +152,7 @@ function classCard(item) {
   wrapper.appendChild(songs);
 
   const seats = Array.isArray(item.seats) ? item.seats : [];
+  const waitlist = Array.isArray(item.waitlist) ? item.waitlist : [];
   const used = seats.filter(Boolean).length;
   const remain = CLASS_CAPACITY - used;
 
@@ -159,6 +160,11 @@ function classCard(item) {
   seatMeta.className = "meta";
   seatMeta.textContent = `名額：${used}/${CLASS_CAPACITY}（剩餘 ${remain}）`;
   wrapper.appendChild(seatMeta);
+
+  const waitlistMeta = document.createElement("p");
+  waitlistMeta.className = "meta";
+  waitlistMeta.textContent = `Waitlist：${waitlist.length} 人`;
+  wrapper.appendChild(waitlistMeta);
 
   const seatGrid = document.createElement("div");
   seatGrid.className = "seat-grid";
