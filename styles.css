@@ -1,5 +1,5 @@
 :root {
-  --bg: #f5efe6;
+  --bg: #ffc0d9;
   --surface: #fffaf1;
   --surface-2: #fff;
   --text: #292524;
@@ -17,10 +17,15 @@
   box-sizing: border-box;
 }
 
+html,
+body {
+  background-color: var(--bg);
+}
+
 body {
   margin: 0;
   color: var(--text);
-  background: #ffc0d9;
+  background: var(--bg);
   font-family: "Noto Sans HK", "PingFang HK", "Microsoft JhengHei", sans-serif;
 }
 
