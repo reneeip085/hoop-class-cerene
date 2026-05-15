@@ -1,10 +1,22 @@
-import { auth, onAuthStateChanged, db, collection, onSnapshot } from "./firebase.js";
+import {
+  auth,
+  onAuthStateChanged,
+  db,
+  collection,
+  getDocs,
+  query,
+  where,
+  orderBy,
+  limit,
+  startAfter,
+} from "./firebase.js";
 
 const operationList = document.getElementById("operationList");
 const noOperation = document.getElementById("noOperation");
 const dateFilter = document.getElementById("dateFilter");
 const clearDateFilterBtn = document.getElementById("clearDateFilter");
 const actionFilter = document.getElementById("actionFilter");
+const refreshOpsBtn = document.getElementById("refreshOpsBtn");
 const prevBtn = document.getElementById("prevBtn");
 const nextBtn = document.getElementById("nextBtn");
 const pageInfo = document.getElementById("pageInfo");
@@ -23,9 +35,11 @@ const ACTION_LABELS = {
 };
 
 const RECORDS_PER_PAGE = 50;
-let allOperations = [];
-let filteredOperations = [];
 let currentPage = 0;
+let currentOperations = [];
+let pageCursors = [null];
+let hasNextPage = false;
+let isLoading = false;
 
 function toTime(ts) {
   if (!ts) {
@@ -78,31 +92,78 @@ function formatDetailText(action, details) {
   return text;
 }
 
-function filterOperations() {
-  const filterDate = dateFilter.value;
-  const filterAction = actionFilter.value;
+function buildRangeFromDate(value) {
+  if (!value) {
+    return null;
+  }
 
-  filteredOperations = allOperations.filter((op) => {
-    if (filterDate) {
-      const opDate = toDateOnly(op.createdAt);
-      const selectedDate = new Date(filterDate).toLocaleDateString("zh-HK");
-      if (opDate !== selectedDate) {
-        return false;
-      }
+  const start = new Date(`${value}T00:00:00`).getTime();
+  const end = new Date(`${value}T23:59:59.999`).getTime();
+  return { start, end };
+}
+
+function buildBaseQuery() {
+  const constraints = [];
+  const actionSource = actionFilter.value;
+  const dateRange = buildRangeFromDate(dateFilter.value);
+
+  if (actionSource) {
+    constraints.push(where("source", "==", actionSource));
+  }
+
+  if (dateRange) {
+    constraints.push(where("createdAt", ">=", dateRange.start));
+    constraints.push(where("createdAt", "<=", dateRange.end));
+  }
+
+  constraints.push(orderBy("createdAt", "desc"));
+  constraints.push(limit(RECORDS_PER_PAGE));
+  return query(collection(db, "operations"), ...constraints);
+}
+
+async function loadPage(pageIndex) {
+  if (isLoading) {
+    return;
+  }
+
+  isLoading = true;
+  prevBtn.disabled = true;
+  nextBtn.disabled = true;
+  pageInfo.textContent = "載入中...";
+
+  try {
+    const cursor = pageIndex > 0 ? pageCursors[pageIndex - 1] : null;
+    let q = buildBaseQuery();
+    if (cursor) {
+      q = query(q, startAfter(cursor));
     }
 
-    if (filterAction) {
-      const opSource = getActionSource(op.action);
-      if (opSource !== filterAction) {
-        return false;
-      }
+    const snap = await getDocs(q);
+    currentOperations = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    hasNextPage = snap.docs.length === RECORDS_PER_PAGE;
+
+    if (snap.docs.length > 0) {
+      pageCursors[pageIndex] = snap.docs[snap.docs.length - 1];
     }
 
-    return true;
-  });
+    currentPage = pageIndex;
+    render();
+  } catch (error) {
+    console.error("讀取操作記錄失敗", error);
+    operationList.innerHTML = "";
+    noOperation.classList.remove("hidden");
+    pageInfo.textContent = "讀取失敗，請稍後再試";
+  } finally {
+    isLoading = false;
+  }
+}
 
+function resetAndLoadFirstPage() {
   currentPage = 0;
-  render();
+  currentOperations = [];
+  hasNextPage = false;
+  pageCursors = [null];
+  loadPage(0);
 }
 
 function renderTableRow(op) {
@@ -129,23 +190,18 @@ function renderTableRow(op) {
 }
 
 function render() {
-  const total = filteredOperations.length;
-  const totalPages = Math.ceil(total / RECORDS_PER_PAGE);
+  const total = currentOperations.length;
 
   if (total === 0) {
     operationList.innerHTML = "";
     noOperation.classList.remove("hidden");
-    prevBtn.disabled = true;
-    nextBtn.disabled = true;
-    pageInfo.textContent = "";
+    prevBtn.disabled = currentPage === 0;
+    nextBtn.disabled = !hasNextPage;
+    pageInfo.textContent = `第 ${currentPage + 1} 頁`;
     return;
   }
 
   noOperation.classList.add("hidden");
-
-  const start = currentPage * RECORDS_PER_PAGE;
-  const end = start + RECORDS_PER_PAGE;
-  const pageData = filteredOperations.slice(start, end);
 
   const table = document.createElement("table");
   table.style.width = "100%";
@@ -166,7 +222,7 @@ function render() {
   table.appendChild(thead);
 
   const tbody = document.createElement("tbody");
-  pageData.forEach((op) => {
+  currentOperations.forEach((op) => {
     const row = renderTableRow(op);
     row.style.borderBottom = "1px solid #eee";
     [...row.children].forEach((cell) => {
@@ -180,29 +236,27 @@ function render() {
   operationList.appendChild(table);
 
   prevBtn.disabled = currentPage === 0;
-  nextBtn.disabled = currentPage >= totalPages - 1;
-  pageInfo.textContent = `第 ${currentPage + 1} / ${totalPages} 頁（共 ${total} 條）`;
+  nextBtn.disabled = !hasNextPage;
+  pageInfo.textContent = `第 ${currentPage + 1} 頁`;
 }
 
-dateFilter.addEventListener("change", filterOperations);
+dateFilter.addEventListener("change", resetAndLoadFirstPage);
 clearDateFilterBtn.addEventListener("click", () => {
   dateFilter.value = "";
-  filterOperations();
+  resetAndLoadFirstPage();
 });
-actionFilter.addEventListener("change", filterOperations);
+actionFilter.addEventListener("change", resetAndLoadFirstPage);
+refreshOpsBtn.addEventListener("click", resetAndLoadFirstPage);
 
 prevBtn.addEventListener("click", () => {
   if (currentPage > 0) {
-    currentPage -= 1;
-    render();
+    loadPage(currentPage - 1);
   }
 });
 
 nextBtn.addEventListener("click", () => {
-  const totalPages = Math.ceil(filteredOperations.length / RECORDS_PER_PAGE);
-  if (currentPage < totalPages - 1) {
-    currentPage += 1;
-    render();
+  if (hasNextPage) {
+    loadPage(currentPage + 1);
   }
 });
 
@@ -213,10 +267,5 @@ onAuthStateChanged(auth, (user) => {
     return;
   }
 
-  onSnapshot(collection(db, "operations"), (snapshot) => {
-    allOperations = snapshot.docs
-      .map((d) => ({ id: d.id, ...d.data() }))
-      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-    filterOperations();
-  });
+  resetAndLoadFirstPage();
 });

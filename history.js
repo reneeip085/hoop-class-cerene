@@ -1,8 +1,9 @@
-import { auth, onAuthStateChanged, db, collection, onSnapshot } from "./firebase.js";
+import { auth, onAuthStateChanged, db, collection, getDocs, query, orderBy } from "./firebase.js";
 
 const CLASS_CAPACITY = 6;
 const historyContainer = document.getElementById("historyClasses");
 const noHistory = document.getElementById("noHistory");
+const refreshHistoryBtn = document.getElementById("refreshHistoryBtn");
 
 let classes = [];
 
@@ -89,6 +90,20 @@ function render() {
   history.forEach((item) => historyContainer.appendChild(classCard(item)));
 }
 
+async function loadHistory() {
+  try {
+    const snap = await getDocs(query(collection(db, "classes"), orderBy("date", "desc")));
+    classes = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    render();
+  } catch (error) {
+    console.error("讀取歷史班期失敗", error);
+    historyContainer.innerHTML = "";
+    noHistory.classList.remove("hidden");
+  }
+}
+
+refreshHistoryBtn?.addEventListener("click", loadHistory);
+
 onAuthStateChanged(auth, (user) => {
   if (!user) {
     alert("請先在 Admin 頁面登入。");
@@ -96,8 +111,5 @@ onAuthStateChanged(auth, (user) => {
     return;
   }
 
-  onSnapshot(collection(db, "classes"), (snapshot) => {
-    classes = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-    render();
-  });
+  loadHistory();
 });
