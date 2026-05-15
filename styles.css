@@ -20,10 +20,7 @@
 body {
   margin: 0;
   color: var(--text);
-  background:
-    radial-gradient(circle at 10% 10%, #ffc0d9 0, transparent 35%),
-    radial-gradient(circle at 90% 0, #fff 0, transparent 25%),
-    var(--bg);
+  background: #ffc0d9;
   font-family: "Noto Sans HK", "PingFang HK", "Microsoft JhengHei", sans-serif;
 }
 
