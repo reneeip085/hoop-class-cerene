@@ -13,6 +13,8 @@ const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
 const upcomingContainer = document.getElementById("upcomingClasses");
 const noUpcoming = document.getElementById("noUpcoming");
+const searchDateInput = document.getElementById("searchDate");
+const clearSearchDateBtn = document.getElementById("clearSearchDate");
 const classRulesContent = document.getElementById("classRulesContent");
 const classRulesUpdatedAt = document.getElementById("classRulesUpdatedAt");
 
@@ -378,7 +380,8 @@ function classCard(item) {
 }
 
 function render() {
-  const upcoming = getUpcoming(classes);
+  const selectedDate = searchDateInput?.value || "";
+  const upcoming = getUpcoming(classes).filter((item) => !selectedDate || item.date === selectedDate);
   upcomingContainer.innerHTML = "";
   noUpcoming.classList.toggle("hidden", upcoming.length > 0);
   upcoming.forEach((item) => upcomingContainer.appendChild(classCard(item)));
@@ -775,7 +778,13 @@ cancelBookingBtn.addEventListener("click", async () => {
 });
 
 loadClassRules();
-  onSnapshot(
+searchDateInput?.addEventListener("change", render);
+clearSearchDateBtn?.addEventListener("click", () => {
+  searchDateInput.value = "";
+  render();
+});
+
+onSnapshot(
   collection(db, "classes"),
   (snapshot) => {
     classes = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
