@@ -40,6 +40,17 @@ async function getPrivateContact(classId, pin) {
   return contact;
 }
 
+function renderPrivateContact(classId, pin, containerEl) {
+  containerEl.textContent = "聯絡方法：讀取中...";
+  getPrivateContact(classId, pin)
+    .then((contact) => {
+      containerEl.textContent = contact ? `聯絡方法：${contact}` : "聯絡方法：未提供";
+    })
+    .catch(() => {
+      containerEl.textContent = "聯絡方法：讀取失敗";
+    });
+}
+
 function classDate(item) {
   return new Date(`${item.date}T${item.startTime}:00`);
 }
@@ -171,29 +182,9 @@ function renderClassCard(item) {
       seat.appendChild(st);
 
       const contactText = document.createElement("div");
-      contactText.className = "status hidden";
+      contactText.className = "status";
+      renderPrivateContact(item.id, value.pin || "", contactText);
       seat.appendChild(contactText);
-
-      const contactBtn = document.createElement("button");
-      contactBtn.className = "button secondary";
-      contactBtn.textContent = "查看聯絡";
-      contactBtn.addEventListener("click", async () => {
-        if (contactText.classList.contains("hidden")) {
-          contactText.textContent = "讀取中...";
-          contactText.classList.remove("hidden");
-          try {
-            const contact = await getPrivateContact(item.id, value.pin || "");
-            contactText.textContent = contact ? `聯絡方法：${contact}` : "未提供聯絡方法";
-            contactBtn.textContent = "隱藏聯絡";
-          } catch (error) {
-            contactText.textContent = "讀取聯絡資料失敗";
-          }
-        } else {
-          contactText.classList.add("hidden");
-          contactBtn.textContent = "查看聯絡";
-        }
-      });
-      seat.appendChild(contactBtn);
 
       const clearBtn = document.createElement("button");
       clearBtn.className = "button secondary";
