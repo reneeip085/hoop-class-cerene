@@ -30,6 +30,7 @@ const statusDialogTitle = document.getElementById("statusDialogTitle");
 const confirmPinInput = document.getElementById("confirmPin");
 const paymentMethodWrap = document.getElementById("paymentMethodWrap");
 const paymentMethodInput = document.getElementById("paymentMethodInput");
+const paymentDateInput = document.getElementById("paymentDateInput");
 const cancelBookingBtn = document.getElementById("cancelBookingBtn");
 const saveStatusBtn = document.getElementById("saveStatusBtn");
 const appToast = document.getElementById("appToast");
@@ -311,7 +312,7 @@ function classCard(item) {
       btn.textContent = "更新資料";
       if (!locked) {
         btn.addEventListener("click", () => {
-          openStatusDialog(item.id, "seat", i, value.paymentMethod || "");
+          openStatusDialog(item.id, "seat", i, value.paymentMethod || "", value.paymentDate || "");
         });
         seat.appendChild(btn);
       }
@@ -529,7 +530,7 @@ async function signup(classId, studentName, studentPin) {
   return result;
 }
 
-function openStatusDialog(classId, type, index, paymentMethod) {
+function openStatusDialog(classId, type, index, paymentMethod, paymentDate) {
   activeStatusClassId = classId;
   activeStatusType = type;
   activeStatusIndex = index;
@@ -539,12 +540,14 @@ function openStatusDialog(classId, type, index, paymentMethod) {
     statusDialogTitle.textContent = "更新付款方式";
     paymentMethodWrap.classList.remove("hidden");
     paymentMethodInput.value = paymentMethod || "";
+    paymentDateInput.value = paymentDate || "";
     cancelBookingBtn.textContent = "取消報名";
     saveStatusBtn.classList.remove("hidden");
   } else {
     statusDialogTitle.textContent = "取消等候";
     paymentMethodWrap.classList.add("hidden");
     paymentMethodInput.value = "";
+    paymentDateInput.value = "";
     cancelBookingBtn.textContent = "取消等候";
     saveStatusBtn.classList.add("hidden");
   }
@@ -552,7 +555,7 @@ function openStatusDialog(classId, type, index, paymentMethod) {
   statusDialog.showModal();
 }
 
-async function updatePaymentMethod(classId, seatIndex, confirmPin, paymentMethod) {
+async function updatePaymentMethod(classId, seatIndex, confirmPin, paymentMethod, paymentDate) {
   const classRef = doc(db, "classes", classId);
   let studentName = "";
 
@@ -580,6 +583,7 @@ async function updatePaymentMethod(classId, seatIndex, confirmPin, paymentMethod
 
     studentName = seat.name;
     seat.paymentMethod = paymentMethod;
+    seat.paymentDate = paymentDate || "";
     seat.updatedAt = Date.now();
     seats[seatIndex] = seat;
 
@@ -736,6 +740,7 @@ statusForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const confirmPin = confirmPinInput.value;
   const paymentMethod = paymentMethodInput.value.trim();
+  const paymentDate = paymentDateInput.value.trim();
 
   if (!confirmPin) {
     showToast("請輸入 PIN 碼");
@@ -748,6 +753,7 @@ statusForm.addEventListener("submit", async (event) => {
       activeStatusIndex,
       confirmPin,
       paymentMethod,
+      paymentDate,
     );
     await refreshClassFromServer(activeStatusClassId);
     statusDialog.close();
