@@ -10,6 +10,7 @@ import {
   updateDoc,
   deleteDoc,
   getDoc,
+  setDoc,
   onSnapshot,
 } from "./firebase.js";
 
@@ -300,10 +301,10 @@ classRulesForm.addEventListener("submit", async (event) => {
   try {
     rulesStatus.classList.add("hidden");
     const content = classRulesText.value.trim();
-    await updateDoc(doc(db, "siteInfo", "classRules"), {
+    await setDoc(doc(db, "siteInfo", "classRules"), {
       content,
       updatedAt: Date.now(),
-    });
+    }, { merge: true });
     rulesStatus.textContent = "課堂資訊已保存！";
     rulesStatus.classList.remove("hidden");
     setTimeout(() => {
@@ -311,26 +312,8 @@ classRulesForm.addEventListener("submit", async (event) => {
     }, 2500);
   } catch (error) {
     console.error("保存課堂資訊失敗", error);
-    if (error.code === "not-found") {
-      try {
-        await updateDoc(doc(db, "siteInfo", "classRules"), {
-          content: classRulesText.value.trim(),
-          updatedAt: Date.now(),
-        });
-        rulesStatus.textContent = "課堂資訊已保存！";
-        rulesStatus.classList.remove("hidden");
-      } catch {
-        const content = classRulesText.value.trim();
-        await addDoc(collection(db, "siteInfo"), {
-          id: "classRules",
-          content,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        });
-        rulesStatus.textContent = "課堂資訊已保存！";
-        rulesStatus.classList.remove("hidden");
-      }
-    }
+    rulesStatus.textContent = "保存失敗，請稍後重試";
+    rulesStatus.classList.remove("hidden");
   }
 });
 

@@ -385,13 +385,16 @@ function render() {
 
 async function loadClassRules() {
   try {
-    const snap = await getDoc(doc(db, "siteInfo", "classRules"));
-    const content = snap.exists() ? snap.data().content : "";
-    if (classRulesContent) {
-      classRulesContent.textContent = content;
-    }
+    onSnapshot(doc(db, "siteInfo", "classRules"), (snap) => {
+      const content = snap.exists() ? snap.data().content : "";
+      if (classRulesContent) {
+        classRulesContent.textContent = content;
+      }
+    }, (error) => {
+      console.error("讀取課堂資訊失敗", error);
+    });
   } catch (error) {
-    console.error("讀取課堂資訊失敗", error);
+    console.error("設置課堂資訊監聽失敗", error);
   }
 }
 
