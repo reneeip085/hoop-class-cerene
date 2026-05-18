@@ -32,7 +32,6 @@ const confirmPinInput = document.getElementById("confirmPin");
 const paymentMethodWrap = document.getElementById("paymentMethodWrap");
 const paymentMethodInput = document.getElementById("paymentMethodInput");
 const paymentDateInput = document.getElementById("paymentDateInput");
-const statusContactInput = document.getElementById("statusContactInput");
 const cancelBookingBtn = document.getElementById("cancelBookingBtn");
 const saveStatusBtn = document.getElementById("saveStatusBtn");
 const appToast = document.getElementById("appToast");
@@ -552,9 +551,6 @@ function openStatusDialog(classId, type, index, paymentMethod, paymentDate) {
     paymentMethodWrap.classList.remove("hidden");
     paymentMethodInput.value = paymentMethod || "";
     paymentDateInput.value = paymentDate || "";
-    if (statusContactInput) {
-      statusContactInput.value = "";
-    }
     cancelBookingBtn.textContent = "取消報名";
     saveStatusBtn.classList.remove("hidden");
   } else {
@@ -562,9 +558,6 @@ function openStatusDialog(classId, type, index, paymentMethod, paymentDate) {
     paymentMethodWrap.classList.add("hidden");
     paymentMethodInput.value = "";
     paymentDateInput.value = "";
-    if (statusContactInput) {
-      statusContactInput.value = "";
-    }
     cancelBookingBtn.textContent = "取消等候";
     saveStatusBtn.classList.add("hidden");
   }
@@ -572,7 +565,7 @@ function openStatusDialog(classId, type, index, paymentMethod, paymentDate) {
   statusDialog.showModal();
 }
 
-async function updatePaymentMethod(classId, seatIndex, confirmPin, paymentMethod, paymentDate, contactMethod) {
+async function updatePaymentMethod(classId, seatIndex, confirmPin, paymentMethod, paymentDate) {
   const classRef = doc(db, "classes", classId);
   let studentName = "";
 
@@ -617,8 +610,6 @@ async function updatePaymentMethod(classId, seatIndex, confirmPin, paymentMethod
     paymentMethod,
   }).catch((error) => console.error("寫入操作紀錄失敗", error));
 
-  upsertPrivateContact(classId, studentName, confirmPin, contactMethod)
-    .catch((error) => console.error("寫入聯絡資料失敗", error));
 }
 
 async function cancelEntry(classId, type, index, confirmPin) {
@@ -761,7 +752,6 @@ statusForm.addEventListener("submit", async (event) => {
   const confirmPin = confirmPinInput.value;
   const paymentMethod = paymentMethodInput.value.trim();
   const paymentDate = paymentDateInput.value.trim();
-  const contactMethod = statusContactInput?.value || "";
 
   if (!confirmPin) {
     showToast("請輸入 PIN 碼");
@@ -775,7 +765,6 @@ statusForm.addEventListener("submit", async (event) => {
       confirmPin,
       paymentMethod,
       paymentDate,
-      contactMethod,
     );
     statusDialog.close();
   } catch (error) {
