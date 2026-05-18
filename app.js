@@ -3,6 +3,7 @@ import {
   collection,
   doc,
   addDoc,
+  setDoc,
   getDoc,
   onSnapshot,
   runTransaction,
@@ -23,6 +24,7 @@ const nameForm = document.getElementById("nameForm");
 const nameDialogTitle = document.getElementById("nameDialogTitle");
 const studentNameInput = document.getElementById("studentName");
 const studentPinInput = document.getElementById("studentPin");
+const studentContactInput = document.getElementById("studentContact");
 
 const statusDialog = document.getElementById("statusDialog");
 const statusForm = document.getElementById("statusForm");
@@ -31,6 +33,7 @@ const confirmPinInput = document.getElementById("confirmPin");
 const paymentMethodWrap = document.getElementById("paymentMethodWrap");
 const paymentMethodInput = document.getElementById("paymentMethodInput");
 const paymentDateInput = document.getElementById("paymentDateInput");
+const statusContactInput = document.getElementById("statusContactInput");
 const cancelBookingBtn = document.getElementById("cancelBookingBtn");
 const saveStatusBtn = document.getElementById("saveStatusBtn");
 const appToast = document.getElementById("appToast");
@@ -81,6 +84,15 @@ function askConfirm(message, title = "請確認") {
 
 function normalizeName(name) {
   return name.trim().replace(/\s+/g, " ");
+}
+
+function normalizeContact(contact) {
+  return String(contact || "").trim();
+}
+
+function buildPrivateContactDocId(classId, pin) {
+  const key = `${String(classId || "")}_${String(pin || "").trim().toLowerCase()}`;
+  return key.replace(/[^a-z0-9_-]/gi, "_");
 }
 
 function validatePin(pin) {
@@ -177,6 +189,26 @@ function logOperation(action, details) {
     source: "student",
     createdAt: Date.now(),
   });
+}
+
+async function upsertPrivateContact(classId, studentName, studentPin, contactMethod) {
+  const cleanedContact = normalizeContact(contactMethod);
+  if (!cleanedContact) {
+    return;
+  }
+
+  const docId = buildPrivateContactDocId(classId, studentPin);
+  await setDoc(
+    doc(db, "privateContacts", docId),
+    {
+      classId,
+      studentName,
+      pinKey: String(studentPin || "").trim().toLowerCase(),
+      contactMethod: cleanedContact,
+      updatedAt: Date.now(),
+    },
+    { merge: true },
+  );
 }
 
 function classHeading(item) {
@@ -454,10 +486,13 @@ function openNameDialog(classId, seatIndex) {
   nameDialogTitle.textContent = seatIndex == null ? "加入等候名單" : `報名名額 ${seatIndex + 1}`;
   studentNameInput.value = "";
   studentPinInput.value = "";
+  if (studentContactInput) {
+    studentContactInput.value = "";
+  }
   nameDialog.showModal();
 }
 
-async function signup(classId, studentName, studentPin) {
+async function signup(classId, studentName, studentPin, contactMethod) {
   const classRef = doc(db, "classes", classId);
   let classData = null;
   let result = { mode: "seat", seatIndex: -1, waitlistPosition: -1 };
@@ -527,6 +562,8 @@ async function signup(classId, studentName, studentPin) {
     });
   }
 
+  await upsertPrivateContact(classId, studentName, studentPin, contactMethod);
+
   return result;
 }
 
@@ -541,6 +578,9 @@ function openStatusDialog(classId, type, index, paymentMethod, paymentDate) {
     paymentMethodWrap.classList.remove("hidden");
     paymentMethodInput.value = paymentMethod || "";
     paymentDateInput.value = paymentDate || "";
+    if (statusContactInput) {
+      statusContactInput.value = "";
+    }
     cancelBookingBtn.textContent = "取消報名";
     saveStatusBtn.classList.remove("hidden");
   } else {
@@ -548,6 +588,9 @@ function openStatusDialog(classId, type, index, paymentMethod, paymentDate) {
     paymentMethodWrap.classList.add("hidden");
     paymentMethodInput.value = "";
     paymentDateInput.value = "";
+    if (statusContactInput) {
+      statusContactInput.value = "";
+    }
     cancelBookingBtn.textContent = "取消等候";
     saveStatusBtn.classList.add("hidden");
   }
@@ -555,7 +598,7 @@ function openStatusDialog(classId, type, index, paymentMethod, paymentDate) {
   statusDialog.showModal();
 }
 
-async function updatePaymentMethod(classId, seatIndex, confirmPin, paymentMethod, paymentDate) {
+async function updatePaymentMethod(classId, seatIndex, confirmPin, paymentMethod, paymentDate, contactMethod) {
   const classRef = doc(db, "classes", classId);
   let studentName = "";
 
@@ -599,6 +642,8 @@ async function updatePaymentMethod(classId, seatIndex, confirmPin, paymentMethod
     studentName,
     paymentMethod,
   });
+
+  await upsertPrivateContact(classId, studentName, confirmPin, contactMethod);
 }
 
 async function cancelEntry(classId, type, index, confirmPin) {
@@ -707,6 +752,7 @@ nameForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const studentName = normalizeName(studentNameInput.value);
   const studentPin = studentPinInput.value;
+  const studentContact = studentContactInput?.value || "";
 
   if (!studentName) {
     showToast("請輸入名字");
@@ -715,7 +761,7 @@ nameForm.addEventListener("submit", async (event) => {
 
   try {
     validatePin(studentPin);
-    const result = await signup(pendingSignupClassId, studentName, studentPin);
+    const result = await signup(pendingSignupClassId, studentName, studentPin, studentContact);
     await refreshClassFromServer(pendingSignupClassId);
 
     if (result.mode === "waitlist") {
@@ -741,6 +787,7 @@ statusForm.addEventListener("submit", async (event) => {
   const confirmPin = confirmPinInput.value;
   const paymentMethod = paymentMethodInput.value.trim();
   const paymentDate = paymentDateInput.value.trim();
+  const contactMethod = statusContactInput?.value || "";
 
   if (!confirmPin) {
     showToast("請輸入 PIN 碼");
@@ -754,6 +801,7 @@ statusForm.addEventListener("submit", async (event) => {
       confirmPin,
       paymentMethod,
       paymentDate,
+      contactMethod,
     );
     await refreshClassFromServer(activeStatusClassId);
     statusDialog.close();

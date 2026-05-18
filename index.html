@@ -56,6 +56,9 @@
       <label for="studentPin">PIN 碼（4-6 位數字或字母）</label>
       <input id="studentPin" name="studentPin" maxlength="6" required placeholder="e.g. 1234 或 abc12">
 
+      <label for="studentContact">聯絡方法（只供老師）</label>
+      <input id="studentContact" name="studentContact" maxlength="80" placeholder="例如：WhatsApp 9123 4567（不會公開顯示）">
+
       <menu>
         <button value="cancel" class="button secondary" formnovalidate>取消</button>
         <button value="confirm" class="button">確認</button>
@@ -76,6 +79,8 @@
           <label for="paymentDateInput">付款日期</label>
           <input id="paymentDateInput" type="date">
         </div>
+        <label for="statusContactInput">聯絡方法（只供老師）</label>
+        <input id="statusContactInput" maxlength="80" placeholder="例如：WhatsApp 9123 4567（不會公開顯示）">
       </div>
 
       <menu>
@@ -86,6 +91,6 @@
     </form>
   </dialog>
 
-  <script type="module" src="app.js?v=20260518-1"></script>
+  <script type="module" src="app.js?v=20260518-2"></script>
 </body>
 </html>
