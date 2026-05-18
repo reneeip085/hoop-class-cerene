@@ -7,6 +7,7 @@ import {
   deleteDoc,
   updateDoc,
   addDoc,
+  getDoc,
   onSnapshot,
 } from "./firebase.js";
 
@@ -20,6 +21,24 @@ const noClass = document.getElementById("noClass");
 
 let classCache = [];
 let sortAscending = true;
+const privateContactCache = new Map();
+
+function buildPrivateContactDocId(classId, pin) {
+  const key = `${String(classId || "")}_${String(pin || "").trim().toLowerCase()}`;
+  return key.replace(/[^a-z0-9_-]/gi, "_");
+}
+
+async function getPrivateContact(classId, pin) {
+  const docId = buildPrivateContactDocId(classId, pin);
+  if (privateContactCache.has(docId)) {
+    return privateContactCache.get(docId);
+  }
+
+  const snap = await getDoc(doc(db, "privateContacts", docId));
+  const contact = snap.exists() ? (snap.data().contactMethod || "") : "";
+  privateContactCache.set(docId, contact);
+  return contact;
+}
 
 function classDate(item) {
   return new Date(`${item.date}T${item.startTime}:00`);
@@ -151,6 +170,31 @@ function renderClassCard(item) {
       st.textContent = value.paymentMethod ? `付款方式：${value.paymentMethod}` : (value.status || "未填付款方式");
       seat.appendChild(st);
 
+      const contactText = document.createElement("div");
+      contactText.className = "status hidden";
+      seat.appendChild(contactText);
+
+      const contactBtn = document.createElement("button");
+      contactBtn.className = "button secondary";
+      contactBtn.textContent = "查看聯絡";
+      contactBtn.addEventListener("click", async () => {
+        if (contactText.classList.contains("hidden")) {
+          contactText.textContent = "讀取中...";
+          contactText.classList.remove("hidden");
+          try {
+            const contact = await getPrivateContact(item.id, value.pin || "");
+            contactText.textContent = contact ? `聯絡方法：${contact}` : "未提供聯絡方法";
+            contactBtn.textContent = "隱藏聯絡";
+          } catch (error) {
+            contactText.textContent = "讀取聯絡資料失敗";
+          }
+        } else {
+          contactText.classList.add("hidden");
+          contactBtn.textContent = "查看聯絡";
+        }
+      });
+      seat.appendChild(contactBtn);
+
       const clearBtn = document.createElement("button");
       clearBtn.className = "button secondary";
       clearBtn.textContent = "移除";
@@ -210,6 +254,7 @@ onAuthStateChanged(auth, (user) => {
 
   onSnapshot(collection(db, "classes"), (snapshot) => {
     classCache = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+    privateContactCache.clear();
     renderClasses();
   });
 });

@@ -4,7 +4,6 @@ import {
   doc,
   addDoc,
   setDoc,
-  getDoc,
   onSnapshot,
   runTransaction,
 } from "./firebase.js";
@@ -455,32 +454,6 @@ async function loadClassRules() {
   }
 }
 
-async function refreshClassFromServer(classId) {
-  try {
-    const snap = await getDoc(doc(db, "classes", classId));
-    if (!snap.exists()) {
-      return;
-    }
-
-    const fresh = { id: snap.id, ...snap.data() };
-    let replaced = false;
-    classes = classes.map((item) => {
-      if (item.id !== classId) {
-        return item;
-      }
-      replaced = true;
-      return fresh;
-    });
-
-    if (!replaced) {
-      classes.push(fresh);
-    }
-    render();
-  } catch (error) {
-    console.error("刷新班期資料失敗", error);
-  }
-}
-
 function openNameDialog(classId, seatIndex) {
   pendingSignupClassId = classId;
   nameDialogTitle.textContent = seatIndex == null ? "加入等候名單" : `報名名額 ${seatIndex + 1}`;
@@ -542,7 +515,7 @@ async function signup(classId, studentName, studentPin, contactMethod) {
     });
   });
 
-  await logOperation("student_signup", {
+  logOperation("student_signup", {
     classId,
     seatIndex: result.seatIndex,
     waitlistPosition: result.waitlistPosition,
@@ -550,19 +523,20 @@ async function signup(classId, studentName, studentPin, contactMethod) {
     studentName,
     classHeader: classData ? formatClassHeader(classData.date, classData.startTime, classData.endTime) : "",
     levels: classData ? (classData.levels || []).join(", ") : "",
-  });
+  }).catch((error) => console.error("寫入操作紀錄失敗", error));
 
   if (result.mode === "waitlist") {
-    await logOperation("student_join_waitlist", {
+    logOperation("student_join_waitlist", {
       classId,
       studentName,
       waitlistPosition: result.waitlistPosition,
       classHeader: classData ? formatClassHeader(classData.date, classData.startTime, classData.endTime) : "",
       levels: classData ? (classData.levels || []).join(", ") : "",
-    });
+    }).catch((error) => console.error("寫入等候紀錄失敗", error));
   }
 
-  await upsertPrivateContact(classId, studentName, studentPin, contactMethod);
+  upsertPrivateContact(classId, studentName, studentPin, contactMethod)
+    .catch((error) => console.error("寫入聯絡資料失敗", error));
 
   return result;
 }
@@ -636,14 +610,15 @@ async function updatePaymentMethod(classId, seatIndex, confirmPin, paymentMethod
     });
   });
 
-  await logOperation("student_update_status", {
+  logOperation("student_update_status", {
     classId,
     seatIndex,
     studentName,
     paymentMethod,
-  });
+  }).catch((error) => console.error("寫入操作紀錄失敗", error));
 
-  await upsertPrivateContact(classId, studentName, confirmPin, contactMethod);
+  upsertPrivateContact(classId, studentName, confirmPin, contactMethod)
+    .catch((error) => console.error("寫入聯絡資料失敗", error));
 }
 
 async function cancelEntry(classId, type, index, confirmPin) {
@@ -721,26 +696,26 @@ async function cancelEntry(classId, type, index, confirmPin) {
   });
 
   if (type === "seat") {
-    await logOperation("student_cancel_booking", {
+    logOperation("student_cancel_booking", {
       classId,
       seatIndex: index,
       studentName,
       promotedName,
-    });
+    }).catch((error) => console.error("寫入取消紀錄失敗", error));
     if (promotedName) {
-      await logOperation("student_promote_from_waitlist", {
+      logOperation("student_promote_from_waitlist", {
         classId,
         studentName: promotedName,
-      });
+      }).catch((error) => console.error("寫入遞補紀錄失敗", error));
     }
     return;
   }
 
-  await logOperation("student_cancel_waitlist", {
+  logOperation("student_cancel_waitlist", {
     classId,
     waitlistIndex: index,
     studentName,
-  });
+  }).catch((error) => console.error("寫入取消等候紀錄失敗", error));
 }
 
 nameForm.addEventListener("submit", async (event) => {
@@ -762,7 +737,6 @@ nameForm.addEventListener("submit", async (event) => {
   try {
     validatePin(studentPin);
     const result = await signup(pendingSignupClassId, studentName, studentPin, studentContact);
-    await refreshClassFromServer(pendingSignupClassId);
 
     if (result.mode === "waitlist") {
       showToast(`班期已滿，已加入等候名單（第 ${result.waitlistPosition} 位）。`);
@@ -803,7 +777,6 @@ statusForm.addEventListener("submit", async (event) => {
       paymentDate,
       contactMethod,
     );
-    await refreshClassFromServer(activeStatusClassId);
     statusDialog.close();
   } catch (error) {
     showToast(error.message || "更新失敗");
@@ -824,7 +797,6 @@ cancelBookingBtn.addEventListener("click", async () => {
 
   try {
     await cancelEntry(activeStatusClassId, activeStatusType, activeStatusIndex, confirmPin);
-    await refreshClassFromServer(activeStatusClassId);
     statusDialog.close();
   } catch (error) {
     showToast(error.message || "取消失敗");
