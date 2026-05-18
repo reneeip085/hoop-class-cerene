@@ -9,6 +9,7 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
+  getDoc,
   onSnapshot,
 } from "./firebase.js";
 
@@ -26,6 +27,10 @@ const classForm = document.getElementById("classForm");
 const editingClassId = document.getElementById("editingClassId");
 const formTitle = document.getElementById("formTitle");
 const cancelEditBtn = document.getElementById("cancelEdit");
+
+const classRulesForm = document.getElementById("classRulesForm");
+const classRulesText = document.getElementById("classRulesText");
+const rulesStatus = document.getElementById("rulesStatus");
 
 const dateInput = document.getElementById("date");
 const startHourInput = document.getElementById("startHour");
@@ -272,11 +277,71 @@ logoutBtn.addEventListener("click", async () => {
   }
 });
 
+async function loadClassRulesForEdit() {
+  try {
+    const snap = await getDoc(doc(db, "siteInfo", "classRules"));
+    if (snap.exists()) {
+      classRulesText.value = snap.data().content || "";
+    } else {
+      classRulesText.value = "";
+    }
+  } catch (error) {
+    console.error("讀取課堂資訊失敗", error);
+  }
+}
+
+classRulesForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!isAdminReady) {
+    alert("請先登入 admin 帳號");
+    return;
+  }
+
+  try {
+    rulesStatus.classList.add("hidden");
+    const content = classRulesText.value.trim();
+    await updateDoc(doc(db, "siteInfo", "classRules"), {
+      content,
+      updatedAt: Date.now(),
+    });
+    rulesStatus.textContent = "課堂資訊已保存！";
+    rulesStatus.classList.remove("hidden");
+    setTimeout(() => {
+      rulesStatus.classList.add("hidden");
+    }, 2500);
+  } catch (error) {
+    console.error("保存課堂資訊失敗", error);
+    if (error.code === "not-found") {
+      try {
+        await updateDoc(doc(db, "siteInfo", "classRules"), {
+          content: classRulesText.value.trim(),
+          updatedAt: Date.now(),
+        });
+        rulesStatus.textContent = "課堂資訊已保存！";
+        rulesStatus.classList.remove("hidden");
+      } catch {
+        const content = classRulesText.value.trim();
+        await addDoc(collection(db, "siteInfo"), {
+          id: "classRules",
+          content,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+        rulesStatus.textContent = "課堂資訊已保存！";
+        rulesStatus.classList.remove("hidden");
+      }
+    }
+  }
+});
+
 onAuthStateChanged(auth, (user) => {
   isAdminReady = !!user;
   loginSection.classList.toggle("hidden", !!user);
   adminSection.classList.toggle("hidden", !user);
   logoutBtn.classList.toggle("hidden", !user);
+  if (user) {
+    loadClassRulesForEdit();
+  }
 });
 
 populateTimeOptions(startHourInput, startMinuteInput);

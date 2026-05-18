@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Cerence Private class - Admin</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=20260515-1">
 </head>
 <body>
   <header class="site-header">
@@ -82,6 +82,16 @@
         </div>
       </form>
 
+      <section class="card stack" style="margin-top: 24px;">
+        <h2>課堂資訊管理</h2>
+        <p class="muted">編輯學生報名頁面上顯示的重要資訊</p>
+        <form id="classRulesForm" class="stack">
+          <label for="classRulesText">資訊內容</label>
+          <textarea id="classRulesText" rows="20" style="font-family: monospace; font-size: 13px;"></textarea>
+          <button class="button" type="submit">保存課堂資訊</button>
+        </form>
+        <p id="rulesStatus" class="muted hidden"></p>
+      </section>
     </section>
   </main>
 

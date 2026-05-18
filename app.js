@@ -13,6 +13,7 @@ const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
 const upcomingContainer = document.getElementById("upcomingClasses");
 const noUpcoming = document.getElementById("noUpcoming");
+const classRulesContent = document.getElementById("classRulesContent");
 
 const nameDialog = document.getElementById("nameDialog");
 const nameForm = document.getElementById("nameForm");
@@ -382,6 +383,18 @@ function render() {
   upcoming.forEach((item) => upcomingContainer.appendChild(classCard(item)));
 }
 
+async function loadClassRules() {
+  try {
+    const snap = await getDoc(doc(db, "siteInfo", "classRules"));
+    const content = snap.exists() ? snap.data().content : "";
+    if (classRulesContent) {
+      classRulesContent.textContent = content;
+    }
+  } catch (error) {
+    console.error("讀取課堂資訊失敗", error);
+  }
+}
+
 async function refreshClassFromServer(classId) {
   try {
     const snap = await getDoc(doc(db, "classes", classId));
@@ -737,7 +750,8 @@ cancelBookingBtn.addEventListener("click", async () => {
   }
 });
 
-onSnapshot(
+loadClassRules();
+  onSnapshot(
   collection(db, "classes"),
   (snapshot) => {
     classes = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
