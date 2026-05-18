@@ -238,6 +238,22 @@ dialog::backdrop {
   padding: 16px;
 }
 
+.payment-date-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.payment-date-row label {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.payment-date-row input {
+  flex: 1;
+}
+
 menu {
   display: flex;
   justify-content: end;
