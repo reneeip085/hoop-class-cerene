@@ -14,6 +14,7 @@ const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 const upcomingContainer = document.getElementById("upcomingClasses");
 const noUpcoming = document.getElementById("noUpcoming");
 const classRulesContent = document.getElementById("classRulesContent");
+const classRulesUpdatedAt = document.getElementById("classRulesUpdatedAt");
 
 const nameDialog = document.getElementById("nameDialog");
 const nameForm = document.getElementById("nameForm");
@@ -387,8 +388,28 @@ async function loadClassRules() {
   try {
     onSnapshot(doc(db, "siteInfo", "classRules"), (snap) => {
       const content = snap.exists() ? snap.data().content : "";
+      const updatedAt = snap.exists() ? snap.data().updatedAt : null;
       if (classRulesContent) {
         classRulesContent.textContent = content;
+      }
+      if (classRulesUpdatedAt) {
+        if (!updatedAt) {
+          classRulesUpdatedAt.textContent = "";
+          classRulesUpdatedAt.classList.add("hidden");
+        } else {
+          const timeValue = typeof updatedAt === "number"
+            ? updatedAt
+            : (typeof updatedAt?.toMillis === "function" ? updatedAt.toMillis() : null);
+
+          if (!timeValue) {
+            classRulesUpdatedAt.textContent = "";
+            classRulesUpdatedAt.classList.add("hidden");
+          } else {
+            const text = new Date(timeValue).toLocaleString("zh-HK", { hour12: false });
+            classRulesUpdatedAt.textContent = `最後更新時間（由 admin）：${text}`;
+            classRulesUpdatedAt.classList.remove("hidden");
+          }
+        }
       }
     }, (error) => {
       console.error("讀取課堂資訊失敗", error);
