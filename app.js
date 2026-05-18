@@ -409,7 +409,7 @@ async function loadClassRules() {
             classRulesUpdatedAt.classList.add("hidden");
           } else {
             const text = new Date(timeValue).toLocaleString("zh-HK", { hour12: false });
-            classRulesUpdatedAt.textContent = `最後更新時間（由 admin）：${text}`;
+            classRulesUpdatedAt.textContent = `最後更新時間：${text}`;
             classRulesUpdatedAt.classList.remove("hidden");
           }
         }
@@ -778,9 +778,12 @@ cancelBookingBtn.addEventListener("click", async () => {
 });
 
 loadClassRules();
+searchDateInput?.addEventListener("input", render);
 searchDateInput?.addEventListener("change", render);
 clearSearchDateBtn?.addEventListener("click", () => {
-  searchDateInput.value = "";
+  if (searchDateInput) {
+    searchDateInput.value = "";
+  }
   render();
 });
 
