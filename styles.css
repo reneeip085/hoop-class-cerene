@@ -196,7 +196,7 @@ input, select, textarea {
 }
 
 #statusDialog {
-  width: min(560px, 94vw);
+  width: min(760px, 96vw);
 }
 
 .muted {
