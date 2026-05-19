@@ -3,7 +3,6 @@ import { auth, onAuthStateChanged, db, collection, getDocs, query, orderBy } fro
 const CLASS_CAPACITY = 6;
 const historyContainer = document.getElementById("historyClasses");
 const noHistory = document.getElementById("noHistory");
-const refreshHistoryBtn = document.getElementById("refreshHistoryBtn");
 
 let classes = [];
 
@@ -73,12 +72,31 @@ function classCard(item) {
   wrapper.appendChild(songs);
 
   const seats = Array.isArray(item.seats) ? item.seats : [];
-  const used = seats.filter(Boolean).length;
+  const attendees = seats.filter(Boolean);
+  const used = attendees.length;
 
   const seatMeta = document.createElement("p");
   seatMeta.className = "meta";
   seatMeta.textContent = `出席：${used}/${CLASS_CAPACITY}`;
   wrapper.appendChild(seatMeta);
+
+  if (attendees.length > 0) {
+    const attendeeTitle = document.createElement("p");
+    attendeeTitle.className = "meta";
+    attendeeTitle.textContent = "報名名單與付款資料";
+    wrapper.appendChild(attendeeTitle);
+
+    const attendeeList = document.createElement("ul");
+    attendeeList.className = "song-list";
+    attendees.forEach((seat, idx) => {
+      const li = document.createElement("li");
+      const paymentMethod = seat.paymentMethod || "未填";
+      const paymentDate = seat.paymentDate || "未填";
+      li.textContent = `${idx + 1}. ${seat.name || "--"} | 付款方式: ${paymentMethod} | 付款日期: ${paymentDate}`;
+      attendeeList.appendChild(li);
+    });
+    wrapper.appendChild(attendeeList);
+  }
 
   return wrapper;
 }
@@ -101,8 +119,6 @@ async function loadHistory() {
     noHistory.classList.remove("hidden");
   }
 }
-
-refreshHistoryBtn?.addEventListener("click", loadHistory);
 
 onAuthStateChanged(auth, (user) => {
   if (!user) {
