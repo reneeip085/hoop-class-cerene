@@ -4,6 +4,7 @@ import {
   doc,
   addDoc,
   setDoc,
+  getDoc,
   onSnapshot,
   runTransaction,
 } from "./firebase.js";
@@ -100,8 +101,8 @@ function normalizeContact(contact) {
   return cleaned;
 }
 
-function buildPrivateContactDocId(classId, pin) {
-  const key = `${String(classId || "")}_${String(pin || "").trim().toLowerCase()}`;
+function buildPrivateContactDocId(classId, studentName, pin) {
+  const key = `${String(classId || "")}_${String(studentName || "").toLowerCase()}_${String(pin || "").trim().toLowerCase()}`;
   return key.replace(/[^a-z0-9_-]/gi, "_");
 }
 
@@ -207,7 +208,7 @@ async function upsertPrivateContact(classId, studentName, studentPin, contactMet
     return;
   }
 
-  const docId = buildPrivateContactDocId(classId, studentPin);
+  const docId = buildPrivateContactDocId(classId, studentName, studentPin);
   await setDoc(
     doc(db, "privateContacts", docId),
     {
@@ -611,7 +612,7 @@ function openStatusDialog(classId, type, index) {
   statusDialog.showModal();
 }
 
-function verifyStatusPinAndReveal() {
+async function verifyStatusPinAndReveal() {
   if (activeStatusType !== "seat") {
     return;
   }
@@ -642,6 +643,21 @@ function verifyStatusPinAndReveal() {
   statusPinGate.classList.add("hidden");
   paymentMethodInput.value = active.seat.paymentMethod || "";
   paymentDateInput.value = active.seat.paymentDate || "";
+  
+  // 讀取之前填入的聯絡方法
+  const docId = buildPrivateContactDocId(activeStatusClassId, active.seat.name, confirmPin);
+  try {
+    const contactSnap = await getDoc(doc(db, "privateContacts", docId));
+    if (contactSnap.exists()) {
+      statusContactInput.value = contactSnap.data().contactMethod || "";
+    } else {
+      statusContactInput.value = "";
+    }
+  } catch (error) {
+    console.error("讀取聯絡資料失敗", error);
+    statusContactInput.value = "";
+  }
+  
   paymentMethodWrap.classList.remove("hidden");
   statusContactWrap.classList.remove("hidden");
   cancelBookingBtn.classList.remove("hidden");
