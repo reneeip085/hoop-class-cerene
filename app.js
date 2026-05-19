@@ -10,7 +10,6 @@ import {
 
 const CLASS_CAPACITY = 6;
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
-const CONTACT_EXAMPLE = "例如: Wts: 9123456 或 ig: dancerence_chan 或 其他";
 
 const upcomingContainer = document.getElementById("upcomingClasses");
 const noUpcoming = document.getElementById("noUpcoming");
@@ -95,7 +94,7 @@ function normalizeName(name) {
 
 function normalizeContact(contact) {
   const cleaned = String(contact || "").trim();
-  if (!cleaned || cleaned === CONTACT_EXAMPLE) {
+  if (!cleaned) {
     return "";
   }
   return cleaned;
@@ -485,7 +484,7 @@ function openNameDialog(classId, seatIndex) {
   studentNameInput.value = "";
   studentPinInput.value = "";
   if (studentContactInput) {
-    studentContactInput.value = CONTACT_EXAMPLE;
+    studentContactInput.value = "";
   }
   if (studentPaymentMethodInput) {
     studentPaymentMethodInput.value = "";
@@ -582,7 +581,7 @@ function openStatusDialog(classId, type, index) {
   paymentMethodInput.value = "";
   paymentDateInput.value = "";
   if (statusContactInput) {
-    statusContactInput.value = CONTACT_EXAMPLE;
+    statusContactInput.value = "";
   }
 
   if (type === "seat") {
