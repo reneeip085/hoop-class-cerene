@@ -1,3 +1,7 @@
+input::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
 :root {
   --bg: #ffc0d9;
   --surface: #fffaf1;
