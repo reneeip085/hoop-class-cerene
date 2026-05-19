@@ -41,7 +41,7 @@ async function getPrivateContact(classId, pin) {
 }
 
 function renderPrivateContact(classId, pin, containerEl) {
-  containerEl.textContent = "聯絡方法：讀取中...";
+  containerEl.textContent = "聯絡資料載入中...";
   getPrivateContact(classId, pin)
     .then((contact) => {
       containerEl.textContent = contact ? `聯絡方法：${contact}` : "聯絡方法：未提供";
@@ -216,7 +216,9 @@ function renderClassCard(item) {
 
 function renderClasses() {
   const keyword = searchDateInput.value;
+  const now = new Date();
   const list = [...classCache]
+    .filter((item) => classDate(item) >= now)
     .filter((item) => !keyword || item.date === keyword)
     .sort((a, b) => sortAscending ? classDate(a) - classDate(b) : classDate(b) - classDate(a));
 

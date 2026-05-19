@@ -24,14 +24,20 @@ const nameDialogTitle = document.getElementById("nameDialogTitle");
 const studentNameInput = document.getElementById("studentName");
 const studentPinInput = document.getElementById("studentPin");
 const studentContactInput = document.getElementById("studentContact");
+const studentPaymentMethodInput = document.getElementById("studentPaymentMethod");
+const studentPaymentDateInput = document.getElementById("studentPaymentDate");
 
 const statusDialog = document.getElementById("statusDialog");
 const statusForm = document.getElementById("statusForm");
 const statusDialogTitle = document.getElementById("statusDialogTitle");
 const confirmPinInput = document.getElementById("confirmPin");
+const statusVerifyHint = document.getElementById("statusVerifyHint");
+const verifyPinBtn = document.getElementById("verifyPinBtn");
 const paymentMethodWrap = document.getElementById("paymentMethodWrap");
 const paymentMethodInput = document.getElementById("paymentMethodInput");
 const paymentDateInput = document.getElementById("paymentDateInput");
+const statusContactWrap = document.getElementById("statusContactWrap");
+const statusContactInput = document.getElementById("statusContactInput");
 const cancelBookingBtn = document.getElementById("cancelBookingBtn");
 const saveStatusBtn = document.getElementById("saveStatusBtn");
 const appToast = document.getElementById("appToast");
@@ -45,6 +51,7 @@ let pendingSignupClassId = null;
 let activeStatusClassId = null;
 let activeStatusIndex = null;
 let activeStatusType = "seat";
+let statusPinVerified = false;
 let toastTimer = null;
 
 function showToast(message) {
@@ -251,6 +258,19 @@ function normalizeWaitlist(waitlist) {
   return deduped;
 }
 
+function getActiveSeatRecord() {
+  const classItem = classes.find((item) => item.id === activeStatusClassId);
+  if (!classItem) {
+    return null;
+  }
+  const seats = normalizeSeats(Array.isArray(classItem.seats) ? classItem.seats : []);
+  const seat = seats[activeStatusIndex];
+  if (!seat) {
+    return null;
+  }
+  return { classItem, seat };
+}
+
 function classCard(item) {
   const wrapper = document.createElement("article");
   wrapper.className = "card";
@@ -342,7 +362,7 @@ function classCard(item) {
       btn.textContent = "更新資料";
       if (!locked) {
         btn.addEventListener("click", () => {
-          openStatusDialog(item.id, "seat", i, value.paymentMethod || "", value.paymentDate || "");
+          openStatusDialog(item.id, "seat", i);
         });
         seat.appendChild(btn);
       }
@@ -398,7 +418,7 @@ function classCard(item) {
       cancelWaitBtn.textContent = "取消等候";
       cancelWaitBtn.disabled = locked;
       cancelWaitBtn.addEventListener("click", () => {
-        openStatusDialog(item.id, "waitlist", idx, "");
+        openStatusDialog(item.id, "waitlist", idx);
       });
       row.appendChild(cancelWaitBtn);
 
@@ -461,10 +481,16 @@ function openNameDialog(classId, seatIndex) {
   if (studentContactInput) {
     studentContactInput.value = "";
   }
+  if (studentPaymentMethodInput) {
+    studentPaymentMethodInput.value = "";
+  }
+  if (studentPaymentDateInput) {
+    studentPaymentDateInput.value = "";
+  }
   nameDialog.showModal();
 }
 
-async function signup(classId, studentName, studentPin, contactMethod) {
+async function signup(classId, studentName, studentPin, contactMethod, paymentMethod, paymentDate) {
   const classRef = doc(db, "classes", classId);
   let classData = null;
   let result = { mode: "seat", seatIndex: -1, waitlistPosition: -1 };
@@ -494,7 +520,8 @@ async function signup(classId, studentName, studentPin, contactMethod) {
       seats[firstEmpty] = {
         name: studentName,
         pin: studentPin,
-        paymentMethod: "",
+        paymentMethod: paymentMethod || "",
+        paymentDate: paymentDate || "",
         updatedAt: Date.now(),
       };
       result = { mode: "seat", seatIndex: firstEmpty, waitlistPosition: -1 };
@@ -540,24 +567,32 @@ async function signup(classId, studentName, studentPin, contactMethod) {
   return result;
 }
 
-function openStatusDialog(classId, type, index, paymentMethod, paymentDate) {
+function openStatusDialog(classId, type, index) {
   activeStatusClassId = classId;
   activeStatusType = type;
   activeStatusIndex = index;
+  statusPinVerified = false;
   confirmPinInput.value = "";
+  paymentMethodInput.value = "";
+  paymentDateInput.value = "";
+  if (statusContactInput) {
+    statusContactInput.value = "";
+  }
 
   if (type === "seat") {
-    statusDialogTitle.textContent = "更新付款方式";
-    paymentMethodWrap.classList.remove("hidden");
-    paymentMethodInput.value = paymentMethod || "";
-    paymentDateInput.value = paymentDate || "";
+    statusDialogTitle.textContent = "更新資料";
+    statusVerifyHint.classList.remove("hidden");
+    verifyPinBtn.classList.remove("hidden");
+    paymentMethodWrap.classList.add("hidden");
+    statusContactWrap.classList.add("hidden");
     cancelBookingBtn.textContent = "取消報名";
-    saveStatusBtn.classList.remove("hidden");
+    saveStatusBtn.classList.add("hidden");
   } else {
     statusDialogTitle.textContent = "取消等候";
+    statusVerifyHint.classList.add("hidden");
+    verifyPinBtn.classList.add("hidden");
     paymentMethodWrap.classList.add("hidden");
-    paymentMethodInput.value = "";
-    paymentDateInput.value = "";
+    statusContactWrap.classList.add("hidden");
     cancelBookingBtn.textContent = "取消等候";
     saveStatusBtn.classList.add("hidden");
   }
@@ -565,7 +600,43 @@ function openStatusDialog(classId, type, index, paymentMethod, paymentDate) {
   statusDialog.showModal();
 }
 
-async function updatePaymentMethod(classId, seatIndex, confirmPin, paymentMethod, paymentDate) {
+function verifyStatusPinAndReveal() {
+  if (activeStatusType !== "seat") {
+    return;
+  }
+
+  const confirmPin = confirmPinInput.value.trim();
+  if (!confirmPin) {
+    showToast("請輸入 PIN 碼");
+    return;
+  }
+
+  const active = getActiveSeatRecord();
+  if (!active) {
+    showToast("找不到名額資料");
+    return;
+  }
+
+  if (isWithin24Hours(active.classItem)) {
+    showToast("開班前 24 小時內不可修改資料");
+    return;
+  }
+
+  if (active.seat.pin !== confirmPin) {
+    showToast("PIN 碼錯誤");
+    return;
+  }
+
+  statusPinVerified = true;
+  paymentMethodInput.value = active.seat.paymentMethod || "";
+  paymentDateInput.value = active.seat.paymentDate || "";
+  paymentMethodWrap.classList.remove("hidden");
+  statusContactWrap.classList.remove("hidden");
+  saveStatusBtn.classList.remove("hidden");
+  verifyPinBtn.classList.add("hidden");
+}
+
+async function updatePaymentMethod(classId, seatIndex, confirmPin, paymentMethod, paymentDate, contactMethod) {
   const classRef = doc(db, "classes", classId);
   let studentName = "";
 
@@ -609,6 +680,9 @@ async function updatePaymentMethod(classId, seatIndex, confirmPin, paymentMethod
     studentName,
     paymentMethod,
   }).catch((error) => console.error("寫入操作紀錄失敗", error));
+
+  upsertPrivateContact(classId, studentName, confirmPin, contactMethod)
+    .catch((error) => console.error("寫入聯絡資料失敗", error));
 
 }
 
@@ -719,6 +793,8 @@ nameForm.addEventListener("submit", async (event) => {
   const studentName = normalizeName(studentNameInput.value);
   const studentPin = studentPinInput.value;
   const studentContact = studentContactInput?.value || "";
+  const studentPaymentMethod = studentPaymentMethodInput?.value.trim() || "";
+  const studentPaymentDate = studentPaymentDateInput?.value.trim() || "";
 
   if (!studentName) {
     showToast("請輸入名字");
@@ -727,7 +803,14 @@ nameForm.addEventListener("submit", async (event) => {
 
   try {
     validatePin(studentPin);
-    const result = await signup(pendingSignupClassId, studentName, studentPin, studentContact);
+    const result = await signup(
+      pendingSignupClassId,
+      studentName,
+      studentPin,
+      studentContact,
+      studentPaymentMethod,
+      studentPaymentDate,
+    );
 
     if (result.mode === "waitlist") {
       showToast(`班期已滿，已加入等候名單（第 ${result.waitlistPosition} 位）。`);
@@ -752,6 +835,12 @@ statusForm.addEventListener("submit", async (event) => {
   const confirmPin = confirmPinInput.value;
   const paymentMethod = paymentMethodInput.value.trim();
   const paymentDate = paymentDateInput.value.trim();
+  const contactMethod = statusContactInput?.value.trim() || "";
+
+  if (!statusPinVerified) {
+    showToast("請先驗證 PIN 碼");
+    return;
+  }
 
   if (!confirmPin) {
     showToast("請輸入 PIN 碼");
@@ -765,12 +854,15 @@ statusForm.addEventListener("submit", async (event) => {
       confirmPin,
       paymentMethod,
       paymentDate,
+      contactMethod,
     );
     statusDialog.close();
   } catch (error) {
     showToast(error.message || "更新失敗");
   }
 });
+
+verifyPinBtn?.addEventListener("click", verifyStatusPinAndReveal);
 
 cancelBookingBtn.addEventListener("click", async () => {
   const confirmPin = confirmPinInput.value;
