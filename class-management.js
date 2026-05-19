@@ -92,7 +92,7 @@ async function removeClass(id) {
 }
 
 async function clearSeat(classId, index) {
-  if (!doubleConfirm("確定移除此報名人？", "請再次確認：要移除這位同學嗎？")) {
+  if (!confirm("確定移除此報名人？")) {
     return;
   }
 
