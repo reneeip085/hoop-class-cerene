@@ -101,9 +101,23 @@ function normalizeContact(contact) {
   return cleaned;
 }
 
-function buildPrivateContactDocId(classId, studentName, pin) {
+function buildPrivateContactDocId(classId, seatIndex, pin) {
+  const key = `${String(classId || "")}_${String(seatIndex ?? "")}_${String(pin || "").trim().toLowerCase()}`;
+  return key.replace(/[^a-z0-9_-]/gi, "_");
+}
+
+function buildLegacyNamePinDocId(classId, studentName, pin) {
   const key = `${String(classId || "")}_${String(studentName || "").toLowerCase()}_${String(pin || "").trim().toLowerCase()}`;
   return key.replace(/[^a-z0-9_-]/gi, "_");
+}
+
+function buildLegacyPinDocId(classId, pin) {
+  const key = `${String(classId || "")}_${String(pin || "").trim().toLowerCase()}`;
+  return key.replace(/[^a-z0-9_-]/gi, "_");
+}
+
+function sameName(a, b) {
+  return normalizeName(String(a || "")).toLowerCase() === normalizeName(String(b || "")).toLowerCase();
 }
 
 function validatePin(pin) {
@@ -202,17 +216,18 @@ function logOperation(action, details) {
   });
 }
 
-async function upsertPrivateContact(classId, studentName, studentPin, contactMethod) {
+async function upsertPrivateContact(classId, seatIndex, studentName, studentPin, contactMethod) {
   const cleanedContact = normalizeContact(contactMethod);
   if (!cleanedContact) {
     return;
   }
 
-  const docId = buildPrivateContactDocId(classId, studentName, studentPin);
+  const docId = buildPrivateContactDocId(classId, seatIndex, studentPin);
   await setDoc(
     doc(db, "privateContacts", docId),
     {
       classId,
+      seatIndex,
       studentName,
       pinKey: String(studentPin || "").trim().toLowerCase(),
       contactMethod: cleanedContact,
@@ -220,6 +235,32 @@ async function upsertPrivateContact(classId, studentName, studentPin, contactMet
     },
     { merge: true },
   );
+}
+
+async function getStoredPrivateContact(classId, seatIndex, studentName, pin) {
+  const primaryId = buildPrivateContactDocId(classId, seatIndex, pin);
+  const primarySnap = await getDoc(doc(db, "privateContacts", primaryId));
+  if (primarySnap.exists()) {
+    return primarySnap.data().contactMethod || "";
+  }
+
+  const namePinId = buildLegacyNamePinDocId(classId, studentName, pin);
+  const namePinSnap = await getDoc(doc(db, "privateContacts", namePinId));
+  if (namePinSnap.exists()) {
+    return namePinSnap.data().contactMethod || "";
+  }
+
+  const pinId = buildLegacyPinDocId(classId, pin);
+  const pinSnap = await getDoc(doc(db, "privateContacts", pinId));
+  if (!pinSnap.exists()) {
+    return "";
+  }
+
+  const data = pinSnap.data() || {};
+  if (sameName(data.studentName, studentName)) {
+    return data.contactMethod || "";
+  }
+  return "";
 }
 
 function classHeading(item) {
@@ -567,7 +608,13 @@ async function signup(classId, studentName, studentPin, contactMethod, paymentMe
     }).catch((error) => console.error("寫入等候紀錄失敗", error));
   }
 
-  upsertPrivateContact(classId, studentName, studentPin, contactMethod)
+  upsertPrivateContact(
+    classId,
+    result.mode === "seat" ? result.seatIndex : "waitlist",
+    studentName,
+    studentPin,
+    contactMethod,
+  )
     .catch((error) => console.error("寫入聯絡資料失敗", error));
 
   return result;
@@ -645,14 +692,13 @@ async function verifyStatusPinAndReveal() {
   paymentDateInput.value = active.seat.paymentDate || "";
   
   // 讀取之前填入的聯絡方法
-  const docId = buildPrivateContactDocId(activeStatusClassId, active.seat.name, confirmPin);
   try {
-    const contactSnap = await getDoc(doc(db, "privateContacts", docId));
-    if (contactSnap.exists()) {
-      statusContactInput.value = contactSnap.data().contactMethod || "";
-    } else {
-      statusContactInput.value = "";
-    }
+    statusContactInput.value = await getStoredPrivateContact(
+      activeStatusClassId,
+      activeStatusIndex,
+      active.seat.name,
+      confirmPin,
+    );
   } catch (error) {
     console.error("讀取聯絡資料失敗", error);
     statusContactInput.value = "";
@@ -711,7 +757,7 @@ async function updatePaymentMethod(classId, seatIndex, confirmPin, paymentMethod
     paymentMethod,
   }).catch((error) => console.error("寫入操作紀錄失敗", error));
 
-  upsertPrivateContact(classId, studentName, confirmPin, contactMethod)
+  upsertPrivateContact(classId, seatIndex, studentName, confirmPin, contactMethod)
     .catch((error) => console.error("寫入聯絡資料失敗", error));
 
 }

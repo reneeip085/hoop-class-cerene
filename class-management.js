@@ -23,18 +23,29 @@ let classCache = [];
 let sortAscending = true;
 const privateContactCache = new Map();
 
-function buildPrivateContactDocId(classId, studentName, pin) {
+function buildPrivateContactDocId(classId, seatIndex, pin) {
+  const key = `${String(classId || "")}_${String(seatIndex ?? "")}_${String(pin || "").trim().toLowerCase()}`;
+  return key.replace(/[^a-z0-9_-]/gi, "_");
+}
+
+function buildLegacyNamePinDocId(classId, studentName, pin) {
   const key = `${String(classId || "")}_${String(studentName || "").toLowerCase()}_${String(pin || "").trim().toLowerCase()}`;
   return key.replace(/[^a-z0-9_-]/gi, "_");
 }
 
-function buildLegacyPrivateContactDocId(classId, pin) {
+function buildLegacyPinDocId(classId, pin) {
   const key = `${String(classId || "")}_${String(pin || "").trim().toLowerCase()}`;
   return key.replace(/[^a-z0-9_-]/gi, "_");
 }
 
-async function getPrivateContact(classId, studentName, pin) {
-  const docId = buildPrivateContactDocId(classId, studentName, pin);
+function sameName(a, b) {
+  const left = String(a || "").trim().replace(/\s+/g, " ").toLowerCase();
+  const right = String(b || "").trim().replace(/\s+/g, " ").toLowerCase();
+  return left === right;
+}
+
+async function getPrivateContact(classId, seatIndex, studentName, pin) {
+  const docId = buildPrivateContactDocId(classId, seatIndex, pin);
   if (privateContactCache.has(docId)) {
     return privateContactCache.get(docId);
   }
@@ -42,12 +53,24 @@ async function getPrivateContact(classId, studentName, pin) {
   const snap = await getDoc(doc(db, "privateContacts", docId));
   let contact = snap.exists() ? (snap.data().contactMethod || "") : "";
 
-  // Backward compatibility for older records saved by classId+pin.
   if (!contact) {
-    const legacyId = buildLegacyPrivateContactDocId(classId, pin);
-    if (legacyId !== docId) {
-      const legacySnap = await getDoc(doc(db, "privateContacts", legacyId));
-      contact = legacySnap.exists() ? (legacySnap.data().contactMethod || "") : "";
+    const legacyNamePinId = buildLegacyNamePinDocId(classId, studentName, pin);
+    if (legacyNamePinId !== docId) {
+      const legacyNamePinSnap = await getDoc(doc(db, "privateContacts", legacyNamePinId));
+      contact = legacyNamePinSnap.exists() ? (legacyNamePinSnap.data().contactMethod || "") : "";
+    }
+  }
+
+  if (!contact) {
+    const legacyPinId = buildLegacyPinDocId(classId, pin);
+    if (legacyPinId !== docId) {
+      const legacyPinSnap = await getDoc(doc(db, "privateContacts", legacyPinId));
+      if (legacyPinSnap.exists()) {
+        const data = legacyPinSnap.data() || {};
+        if (sameName(data.studentName, studentName)) {
+          contact = data.contactMethod || "";
+        }
+      }
     }
   }
 
@@ -55,9 +78,9 @@ async function getPrivateContact(classId, studentName, pin) {
   return contact;
 }
 
-function renderPrivateContact(classId, studentName, pin, containerEl) {
+function renderPrivateContact(classId, seatIndex, studentName, pin, containerEl) {
   containerEl.textContent = "聯絡資料載入中...";
-  getPrivateContact(classId, studentName, pin)
+  getPrivateContact(classId, seatIndex, studentName, pin)
     .then((contact) => {
       containerEl.textContent = contact ? `聯絡方法：${contact}` : "聯絡方法：未提供";
     })
@@ -198,7 +221,7 @@ function renderClassCard(item) {
 
       const contactText = document.createElement("div");
       contactText.className = "status";
-      renderPrivateContact(item.id, value.name || "", value.pin || "", contactText);
+      renderPrivateContact(item.id, i, value.name || "", value.pin || "", contactText);
       seat.appendChild(contactText);
 
       const clearBtn = document.createElement("button");
