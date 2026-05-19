@@ -10,6 +10,7 @@ import {
 
 const CLASS_CAPACITY = 6;
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+const CONTACT_EXAMPLE = "例如: Wts: 9123456 或 ig: dancerence_chan 或 其他";
 
 const upcomingContainer = document.getElementById("upcomingClasses");
 const noUpcoming = document.getElementById("noUpcoming");
@@ -30,6 +31,7 @@ const studentPaymentDateInput = document.getElementById("studentPaymentDate");
 const statusDialog = document.getElementById("statusDialog");
 const statusForm = document.getElementById("statusForm");
 const statusDialogTitle = document.getElementById("statusDialogTitle");
+const statusPinGate = document.getElementById("statusPinGate");
 const confirmPinInput = document.getElementById("confirmPin");
 const statusVerifyHint = document.getElementById("statusVerifyHint");
 const verifyPinBtn = document.getElementById("verifyPinBtn");
@@ -92,7 +94,11 @@ function normalizeName(name) {
 }
 
 function normalizeContact(contact) {
-  return String(contact || "").trim();
+  const cleaned = String(contact || "").trim();
+  if (!cleaned || cleaned === CONTACT_EXAMPLE) {
+    return "";
+  }
+  return cleaned;
 }
 
 function buildPrivateContactDocId(classId, pin) {
@@ -479,7 +485,7 @@ function openNameDialog(classId, seatIndex) {
   studentNameInput.value = "";
   studentPinInput.value = "";
   if (studentContactInput) {
-    studentContactInput.value = "";
+    studentContactInput.value = CONTACT_EXAMPLE;
   }
   if (studentPaymentMethodInput) {
     studentPaymentMethodInput.value = "";
@@ -576,24 +582,30 @@ function openStatusDialog(classId, type, index) {
   paymentMethodInput.value = "";
   paymentDateInput.value = "";
   if (statusContactInput) {
-    statusContactInput.value = "";
+    statusContactInput.value = CONTACT_EXAMPLE;
   }
 
   if (type === "seat") {
     statusDialogTitle.textContent = "更新資料";
+    statusPinGate.classList.remove("hidden");
     statusVerifyHint.classList.remove("hidden");
     verifyPinBtn.classList.remove("hidden");
     paymentMethodWrap.classList.add("hidden");
     statusContactWrap.classList.add("hidden");
     cancelBookingBtn.textContent = "取消報名";
+    cancelBookingBtn.classList.add("hidden");
+    cancelBookingBtn.disabled = true;
     saveStatusBtn.classList.add("hidden");
   } else {
     statusDialogTitle.textContent = "取消等候";
+    statusPinGate.classList.remove("hidden");
     statusVerifyHint.classList.add("hidden");
     verifyPinBtn.classList.add("hidden");
     paymentMethodWrap.classList.add("hidden");
     statusContactWrap.classList.add("hidden");
     cancelBookingBtn.textContent = "取消等候";
+    cancelBookingBtn.classList.remove("hidden");
+    cancelBookingBtn.disabled = false;
     saveStatusBtn.classList.add("hidden");
   }
 
@@ -628,10 +640,13 @@ function verifyStatusPinAndReveal() {
   }
 
   statusPinVerified = true;
+  statusPinGate.classList.add("hidden");
   paymentMethodInput.value = active.seat.paymentMethod || "";
   paymentDateInput.value = active.seat.paymentDate || "";
   paymentMethodWrap.classList.remove("hidden");
   statusContactWrap.classList.remove("hidden");
+  cancelBookingBtn.classList.remove("hidden");
+  cancelBookingBtn.disabled = false;
   saveStatusBtn.classList.remove("hidden");
   verifyPinBtn.classList.add("hidden");
 }
@@ -865,6 +880,11 @@ statusForm.addEventListener("submit", async (event) => {
 verifyPinBtn?.addEventListener("click", verifyStatusPinAndReveal);
 
 cancelBookingBtn.addEventListener("click", async () => {
+  if (activeStatusType === "seat" && !statusPinVerified) {
+    showToast("請先驗證 PIN 碼，才可取消報名");
+    return;
+  }
+
   const confirmPin = confirmPinInput.value;
   if (!confirmPin) {
     showToast("請先輸入 PIN 碼");
