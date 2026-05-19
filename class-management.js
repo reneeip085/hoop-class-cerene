@@ -23,26 +23,41 @@ let classCache = [];
 let sortAscending = true;
 const privateContactCache = new Map();
 
-function buildPrivateContactDocId(classId, pin) {
+function buildPrivateContactDocId(classId, studentName, pin) {
+  const key = `${String(classId || "")}_${String(studentName || "").toLowerCase()}_${String(pin || "").trim().toLowerCase()}`;
+  return key.replace(/[^a-z0-9_-]/gi, "_");
+}
+
+function buildLegacyPrivateContactDocId(classId, pin) {
   const key = `${String(classId || "")}_${String(pin || "").trim().toLowerCase()}`;
   return key.replace(/[^a-z0-9_-]/gi, "_");
 }
 
-async function getPrivateContact(classId, pin) {
-  const docId = buildPrivateContactDocId(classId, pin);
+async function getPrivateContact(classId, studentName, pin) {
+  const docId = buildPrivateContactDocId(classId, studentName, pin);
   if (privateContactCache.has(docId)) {
     return privateContactCache.get(docId);
   }
 
   const snap = await getDoc(doc(db, "privateContacts", docId));
-  const contact = snap.exists() ? (snap.data().contactMethod || "") : "";
+  let contact = snap.exists() ? (snap.data().contactMethod || "") : "";
+
+  // Backward compatibility for older records saved by classId+pin.
+  if (!contact) {
+    const legacyId = buildLegacyPrivateContactDocId(classId, pin);
+    if (legacyId !== docId) {
+      const legacySnap = await getDoc(doc(db, "privateContacts", legacyId));
+      contact = legacySnap.exists() ? (legacySnap.data().contactMethod || "") : "";
+    }
+  }
+
   privateContactCache.set(docId, contact);
   return contact;
 }
 
-function renderPrivateContact(classId, pin, containerEl) {
+function renderPrivateContact(classId, studentName, pin, containerEl) {
   containerEl.textContent = "聯絡資料載入中...";
-  getPrivateContact(classId, pin)
+  getPrivateContact(classId, studentName, pin)
     .then((contact) => {
       containerEl.textContent = contact ? `聯絡方法：${contact}` : "聯絡方法：未提供";
     })
@@ -183,7 +198,7 @@ function renderClassCard(item) {
 
       const contactText = document.createElement("div");
       contactText.className = "status";
-      renderPrivateContact(item.id, value.pin || "", contactText);
+      renderPrivateContact(item.id, value.name || "", value.pin || "", contactText);
       seat.appendChild(contactText);
 
       const clearBtn = document.createElement("button");
