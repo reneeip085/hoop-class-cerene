@@ -57,7 +57,8 @@
       <input id="studentPin" name="studentPin" maxlength="6" required placeholder="e.g. 1234 或 abc12">
 
       <label for="studentContact">聯絡方法（只供老師查閱）</label>
-      <input id="studentContact" name="studentContact" maxlength="80" placeholder="例如: Wts: 9123456 或 ig: dancerence_chan 或 其他">
+      <input id="studentContact" name="studentContact" maxlength="80" placeholder="可留空">
+      <p class="muted">例如: Wts: 9123456 或 ig: dancerence_chan 或 其他</p>
 
       <label for="studentPaymentMethod">付款方式（未付款可留空）</label>
       <input id="studentPaymentMethod" name="studentPaymentMethod" maxlength="60" placeholder="例如：FPS / 現金 / 轉數快">
@@ -77,10 +78,12 @@
   <dialog id="statusDialog">
     <form method="dialog" id="statusForm" class="dialog-form">
       <h3 id="statusDialogTitle">更新資料</h3>
-      <label for="confirmPin">請輸入你的 PIN 碼</label>
-      <input id="confirmPin" maxlength="6" required placeholder="e.g. 1234">
-      <p id="statusVerifyHint" class="muted">請先驗證 PIN 才可編輯資料。</p>
-      <button type="button" id="verifyPinBtn" class="button secondary">驗證 PIN</button>
+      <div id="statusPinGate" class="stack">
+        <label for="confirmPin">請輸入你的 PIN 碼</label>
+        <input id="confirmPin" maxlength="6" required placeholder="e.g. 1234">
+        <p id="statusVerifyHint" class="muted">請先驗證 PIN 才可編輯資料。</p>
+        <button type="button" id="verifyPinBtn" class="button secondary">驗證 PIN</button>
+      </div>
 
       <div id="paymentMethodWrap" class="hidden">
         <label for="paymentMethodInput">付款方式</label>
@@ -93,7 +96,8 @@
 
       <div id="statusContactWrap" class="hidden">
         <label for="statusContactInput">聯絡方法（只供老師查閱）</label>
-        <input id="statusContactInput" maxlength="80" placeholder="例如: Wts: 9123456 或 ig: dancerence_chan 或 其他">
+        <input id="statusContactInput" maxlength="80" placeholder="可留空">
+        <p class="muted">例如: Wts: 9123456 或 ig: dancerence_chan 或 其他</p>
       </div>
 
       <menu>
@@ -104,6 +108,6 @@
     </form>
   </dialog>
 
-  <script type="module" src="app.js?v=20260519-2"></script>
+  <script type="module" src="app.js?v=20260519-3"></script>
 </body>
 </html>
