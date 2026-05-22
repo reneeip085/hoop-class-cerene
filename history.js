@@ -10,6 +10,10 @@ function parseClassDateTime(classItem) {
   return new Date(`${classItem.date}T${classItem.startTime}:00`);
 }
 
+function parseClassEndDateTime(classItem) {
+  return new Date(`${classItem.date}T${classItem.endTime}:00`);
+}
+
 function formatClassHeader(dateStr, startTime, endTime) {
   const dateObj = new Date(`${dateStr}T00:00:00`);
   const dayText = dateObj.toLocaleDateString("en-GB", {
@@ -24,8 +28,8 @@ function formatClassHeader(dateStr, startTime, endTime) {
 function getHistory(items) {
   const now = new Date();
   return items
-    .filter((item) => parseClassDateTime(item) < now)
-    .sort((a, b) => parseClassDateTime(b) - parseClassDateTime(a));
+    .filter((item) => parseClassEndDateTime(item) < now)
+    .sort((a, b) => parseClassEndDateTime(b) - parseClassEndDateTime(a));
 }
 
 function classHeading(item) {

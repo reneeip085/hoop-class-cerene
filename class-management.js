@@ -8,16 +8,33 @@ import {
   updateDoc,
   addDoc,
   getDoc,
+  setDoc,
   onSnapshot,
+  runTransaction,
 } from "./firebase.js";
 
 const CLASS_CAPACITY = 6;
+const LEVELS = ["Lv0", "Lv1", "Lv2"];
 
 const searchDateInput = document.getElementById("searchDate");
 const clearSearchBtn = document.getElementById("clearSearch");
 const sortToggleBtn = document.getElementById("sortToggle");
 const classList = document.getElementById("classList");
 const noClass = document.getElementById("noClass");
+
+// Edit dialog elements
+const editClassDialog = document.getElementById("editClassDialog");
+const editClassForm = document.getElementById("editClassForm");
+const editClassIdInput = document.getElementById("editClassId");
+const editDateInput = document.getElementById("editDate");
+const editStartHour = document.getElementById("editStartHour");
+const editStartMinute = document.getElementById("editStartMinute");
+const editEndHour = document.getElementById("editEndHour");
+const editEndMinute = document.getElementById("editEndMinute");
+const editLocationInput = document.getElementById("editLocation");
+const editLevelInputs = [...document.querySelectorAll('input[name="editLevels"]')];
+const editSongFields = document.getElementById("editSongFields");
+const cancelEditClassBtn = document.getElementById("cancelEditClassBtn");
 
 let classCache = [];
 let sortAscending = true;
@@ -93,6 +110,10 @@ function classDate(item) {
   return new Date(`${item.date}T${item.startTime}:00`);
 }
 
+function classEndDate(item) {
+  return new Date(`${item.date}T${item.endTime}:00`);
+}
+
 function formatClassHeader(dateStr, startTime, endTime) {
   const dateObj = new Date(`${dateStr}T00:00:00`);
   const dayText = dateObj.toLocaleDateString("en-GB", {
@@ -120,6 +141,116 @@ function logOperation(action, details) {
   });
 }
 
+function populateTimeOptions(hourEl, minuteEl) {
+  for (let h = 0; h < 24; h += 1) {
+    const o = document.createElement("option");
+    o.value = String(h).padStart(2, "0");
+    o.textContent = o.value;
+    hourEl.appendChild(o);
+  }
+  for (let m = 0; m < 60; m += 1) {
+    const o = document.createElement("option");
+    o.value = String(m).padStart(2, "0");
+    o.textContent = o.value;
+    minuteEl.appendChild(o);
+  }
+}
+
+function buildEditSongFields() {
+  const selected = editLevelInputs.filter((x) => x.checked).map((x) => x.value);
+  editSongFields.innerHTML = "";
+  if (selected.length === 0) {
+    const notice = document.createElement("p");
+    notice.className = "notice";
+    notice.textContent = "請先選擇 Level，系統會顯示對應歌曲欄位。";
+    editSongFields.appendChild(notice);
+    return;
+  }
+  selected.forEach((lv) => {
+    const wrap = document.createElement("div");
+    wrap.className = "stack";
+    const label = document.createElement("label");
+    label.setAttribute("for", `editSong_${lv}`);
+    label.textContent = `${lv} 歌曲`;
+    const input = document.createElement("input");
+    input.id = `editSong_${lv}`;
+    input.maxLength = 100;
+    input.required = true;
+    wrap.appendChild(label);
+    wrap.appendChild(input);
+    editSongFields.appendChild(wrap);
+  });
+}
+
+function openEditClassDialog(item) {
+  editClassIdInput.value = item.id;
+  editDateInput.value = item.date;
+  const [sh, sm] = (item.startTime || "00:00").split(":");
+  const [eh, em] = (item.endTime || "00:00").split(":");
+  editStartHour.value = sh;
+  editStartMinute.value = sm;
+  editEndHour.value = eh;
+  editEndMinute.value = em;
+  editLocationInput.value = item.location || "";
+  editLevelInputs.forEach((input) => {
+    input.checked = (item.levels || []).includes(input.value);
+  });
+  buildEditSongFields();
+  (item.levels || []).forEach((lv) => {
+    const input = document.getElementById(`editSong_${lv}`);
+    if (input) {
+      input.value = item.songs?.[lv] || "";
+    }
+  });
+  editClassDialog.showModal();
+}
+
+editClassForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const id = editClassIdInput.value;
+  if (!id) return;
+
+  const startTime = `${editStartHour.value}:${editStartMinute.value}`;
+  const endTime = `${editEndHour.value}:${editEndMinute.value}`;
+  const levels = editLevelInputs.filter((x) => x.checked).map((x) => x.value);
+
+  if (levels.length < 1) { alert("請選至少 1 個 Level"); return; }
+  if (!editDateInput.value || !editLocationInput.value.trim()) { alert("請填妥日期及地點"); return; }
+  if (startTime >= endTime) { alert("結束時間必須晚於開始時間"); return; }
+
+  const songs = {};
+  for (const lv of levels) {
+    const input = document.getElementById(`editSong_${lv}`);
+    const song = input?.value.trim();
+    if (!song) { alert(`${lv} 歌曲不可留空`); return; }
+    songs[lv] = song;
+  }
+
+  const payload = {
+    date: editDateInput.value,
+    startTime,
+    endTime,
+    location: editLocationInput.value.trim(),
+    levels,
+    songs,
+    updatedAt: Date.now(),
+  };
+
+  try {
+    await updateDoc(doc(db, "classes", id), payload);
+    await logOperation("admin_update_class", {
+      classId: id,
+      header: formatClassHeader(payload.date, payload.startTime, payload.endTime),
+    });
+    editClassDialog.close();
+  } catch (e) {
+    alert(e.message || "儲存失敗");
+  }
+});
+
+cancelEditClassBtn.addEventListener("click", () => editClassDialog.close());
+editLevelInputs.forEach((x) => x.addEventListener("change", buildEditSongFields));
+
 async function removeClass(id) {
   if (!doubleConfirm("確定刪除此班期？", "請再次確認：此動作無法復原，是否繼續？")) {
     return;
@@ -134,24 +265,73 @@ async function clearSeat(classId, index) {
     return;
   }
 
-  const target = classCache.find((x) => x.id === classId);
-  if (!target) {
-    return;
-  }
+  const classRef = doc(db, "classes", classId);
+  let removedName = "";
+  let promotedName = "";
+  let promotedPin = "";
+  let promotedSeatIndex = -1;
 
-  const seats = Array.isArray(target.seats) ? [...target.seats] : Array(CLASS_CAPACITY).fill(null);
-  const removedName = seats[index]?.name || "";
-  seats[index] = null;
+  await runTransaction(db, async (transaction) => {
+    const snap = await transaction.get(classRef);
+    if (!snap.exists()) return;
+    const data = snap.data();
 
-  await updateDoc(doc(db, "classes", classId), {
-    seats,
-    updatedAt: Date.now(),
+    const seats = Array.isArray(data.seats) ? [...data.seats] : Array(CLASS_CAPACITY).fill(null);
+    const waitlist = Array.isArray(data.waitlist) ? [...data.waitlist].filter(Boolean) : [];
+
+    removedName = seats[index]?.name || "";
+    seats[index] = null;
+
+    // Compact seats and promote from waitlist if any
+    const compacted = [...seats.filter(Boolean), ...Array(CLASS_CAPACITY).fill(null)].slice(0, CLASS_CAPACITY);
+    if (waitlist.length > 0) {
+      const next = waitlist.shift();
+      promotedName = next.name;
+      promotedPin = next.pin || "";
+      const empty = compacted.findIndex((x) => !x);
+      if (empty >= 0) {
+        promotedSeatIndex = empty;
+        compacted[empty] = {
+          name: next.name,
+          pin: next.pin,
+          paymentMethod: "",
+          paymentDate: "",
+          fromWaitlistAt: Date.now(),
+          updatedAt: Date.now(),
+        };
+      }
+    }
+
+    transaction.update(classRef, {
+      seats: compacted,
+      waitlist,
+      updatedAt: Date.now(),
+    });
   });
+
+  // Migrate contact info from waitlist key to seat key for promoted student
+  if (promotedName && promotedSeatIndex >= 0 && promotedPin) {
+    try {
+      const waitlistDocId = buildPrivateContactDocId(classId, "waitlist", promotedPin);
+      const waitlistSnap = await getDoc(doc(db, "privateContacts", waitlistDocId));
+      if (waitlistSnap.exists()) {
+        const newDocId = buildPrivateContactDocId(classId, promotedSeatIndex, promotedPin);
+        await setDoc(doc(db, "privateContacts", newDocId), {
+          ...waitlistSnap.data(),
+          seatIndex: promotedSeatIndex,
+          updatedAt: Date.now(),
+        }, { merge: true });
+      }
+    } catch (e) {
+      console.error("遷移聯絡資料失敗", e);
+    }
+  }
 
   await logOperation("admin_remove_student", {
     classId,
     seatIndex: index,
     studentName: removedName,
+    promotedName,
   });
 }
 
@@ -219,6 +399,11 @@ function renderClassCard(item) {
       st.textContent = value.paymentMethod ? `付款方式：${value.paymentMethod}` : (value.status || "未填付款方式");
       seat.appendChild(st);
 
+      const dateDiv = document.createElement("div");
+      dateDiv.className = "status";
+      dateDiv.textContent = `付款日期：${value.paymentDate || "未提供"}`;
+      seat.appendChild(dateDiv);
+
       const contactText = document.createElement("div");
       contactText.className = "status";
       renderPrivateContact(item.id, i, value.name || "", value.pin || "", contactText);
@@ -238,14 +423,48 @@ function renderClassCard(item) {
   }
   card.appendChild(seatGrid);
 
+  const waitlist = Array.isArray(item.waitlist) ? item.waitlist.filter(Boolean) : [];
+  if (waitlist.length > 0) {
+    const waitTitle = document.createElement("p");
+    waitTitle.className = "meta";
+    waitTitle.textContent = `等候名單（${waitlist.length} 人）`;
+    card.appendChild(waitTitle);
+
+    const waitGrid = document.createElement("div");
+    waitGrid.className = "stack";
+    waitlist.forEach((entry, idx) => {
+      const row = document.createElement("div");
+      row.className = "seat";
+
+      const n = document.createElement("div");
+      n.className = "name";
+      n.textContent = `等 ${idx + 1}. ${entry.name}`;
+      row.appendChild(n);
+
+      const contactEl = document.createElement("div");
+      contactEl.className = "status";
+      renderPrivateContact(item.id, "waitlist", entry.name || "", entry.pin || "", contactEl);
+      row.appendChild(contactEl);
+
+      waitGrid.appendChild(row);
+    });
+    card.appendChild(waitGrid);
+  }
+
   const actions = document.createElement("div");
   actions.className = "inline-buttons";
+
+  const editBtn = document.createElement("button");
+  editBtn.className = "button secondary";
+  editBtn.textContent = "編輯班期";
+  editBtn.addEventListener("click", () => openEditClassDialog(item));
 
   const deleteBtn = document.createElement("button");
   deleteBtn.className = "button danger";
   deleteBtn.textContent = "刪除班期";
   deleteBtn.addEventListener("click", () => removeClass(item.id));
 
+  actions.appendChild(editBtn);
   actions.appendChild(deleteBtn);
   card.appendChild(actions);
 
@@ -256,7 +475,7 @@ function renderClasses() {
   const keyword = searchDateInput.value;
   const now = new Date();
   const list = [...classCache]
-    .filter((item) => classDate(item) >= now)
+    .filter((item) => classEndDate(item) >= now)
     .filter((item) => !keyword || item.date === keyword)
     .sort((a, b) => sortAscending ? classDate(a) - classDate(b) : classDate(b) - classDate(a));
 
@@ -289,3 +508,7 @@ onAuthStateChanged(auth, (user) => {
     renderClasses();
   });
 });
+
+populateTimeOptions(editStartHour, editStartMinute);
+populateTimeOptions(editEndHour, editEndMinute);
+buildEditSongFields();

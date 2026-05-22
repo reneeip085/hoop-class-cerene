@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Cerence Private class - 班期管理</title>
+  <title>Cerene Private Class - 班期管理</title>
   <link rel="stylesheet" href="styles.css?v=20260519-1">
 </head>
 <body>
   <header class="site-header">
     <div>
-      <h1>Cerence Private class - 班期管理</h1>
+      <h1>Cerene Private Class - 班期管理</h1>
       <p class="muted">按日期搜尋並管理班期</p>
     </div>
     <div class="inline-buttons">
@@ -37,6 +37,55 @@
     </section>
   </main>
 
-  <script type="module" src="class-management.js?v=20260519-2"></script>
+
+  <dialog id="editClassDialog">
+    <form id="editClassForm" class="stack">
+      <h2>編輯班期</h2>
+      <input type="hidden" id="editClassId">
+
+      <label for="editDate">日期</label>
+      <input type="date" id="editDate" required>
+
+      <div class="grid2">
+        <div>
+          <label>開始時間</label>
+          <div class="inline-buttons">
+            <select id="editStartHour"></select>
+            <span>:</span>
+            <select id="editStartMinute"></select>
+          </div>
+        </div>
+        <div>
+          <label>結束時間</label>
+          <div class="inline-buttons">
+            <select id="editEndHour"></select>
+            <span>:</span>
+            <select id="editEndMinute"></select>
+          </div>
+        </div>
+      </div>
+
+      <label for="editLocation">地點</label>
+      <input id="editLocation" maxlength="60" required>
+
+      <fieldset>
+        <legend>Level（可選多個）</legend>
+        <div class="inline-checks">
+          <label><input type="checkbox" name="editLevels" value="Lv0"> Lv0</label>
+          <label><input type="checkbox" name="editLevels" value="Lv1"> Lv1</label>
+          <label><input type="checkbox" name="editLevels" value="Lv2"> Lv2</label>
+        </div>
+      </fieldset>
+
+      <div id="editSongFields" class="stack"></div>
+
+      <div class="inline-buttons">
+        <button class="button" type="submit">儲存</button>
+        <button class="button secondary" type="button" id="cancelEditClassBtn">取消</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module" src="class-management.js?v=20260521-3"></script>
 </body>
 </html>

@@ -3,18 +3,18 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Cerence Private class - Admin</title>
+  <title>Cerene Private Class - Admin</title>
   <link rel="stylesheet" href="styles.css?v=20260519-1">
 </head>
 <body>
   <header class="site-header">
     <div>
-      <h1>Cerence Private class - Admin</h1>
+      <h1>Cerene Private Class - Admin</h1>
       <p class="muted">新增或編輯班期</p>
     </div>
     <div class="inline-buttons">
       <a class="button secondary" href="class-management.html">班期管理</a>
-      <a class="button secondary" href="history.html">歷史紀錄</a>
+      <a class="button secondary" href="history.html">歷史班期</a>
       <a class="button secondary" href="admin-history.html">操作歷史</a>
       <a class="button secondary" href="index.html">返回學生頁</a>
       <button id="logoutBtn" class="button secondary hidden" type="button">登出</button>
@@ -88,6 +88,10 @@
         <form id="classRulesForm" class="stack">
           <label for="classRulesText">資訊內容</label>
           <textarea id="classRulesText" rows="20" style="font-family: monospace; font-size: 13px;"></textarea>
+          <label for="paymeImageUrl">PayMe QR Code 圖片 URL（可留空）</label>
+          <input type="url" id="paymeImageUrl" placeholder="https://example.com/payme-qr.png">
+          <label for="paymeLink">PayMe 付款連結（可留空）</label>
+          <input type="url" id="paymeLink" placeholder="https://payme.hsbc.com.hk/...">
           <button class="button" type="submit">保存課堂資訊</button>
         </form>
         <p id="rulesStatus" class="muted hidden"></p>
@@ -95,6 +99,6 @@
     </section>
   </main>
 
-  <script type="module" src="admin.js?v=20260519-1"></script>
+  <script type="module" src="admin.js?v=20260522-1"></script>
 </body>
 </html>

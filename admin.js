@@ -31,6 +31,8 @@ const cancelEditBtn = document.getElementById("cancelEdit");
 
 const classRulesForm = document.getElementById("classRulesForm");
 const classRulesText = document.getElementById("classRulesText");
+const paymeImageUrlInput = document.getElementById("paymeImageUrl");
+const paymeLinkInput = document.getElementById("paymeLink");
 const rulesStatus = document.getElementById("rulesStatus");
 
 const dateInput = document.getElementById("date");
@@ -283,8 +285,12 @@ async function loadClassRulesForEdit() {
     const snap = await getDoc(doc(db, "siteInfo", "classRules"));
     if (snap.exists()) {
       classRulesText.value = snap.data().content || "";
+      paymeImageUrlInput.value = snap.data().paymeImageUrl || "";
+      paymeLinkInput.value = snap.data().paymeLink || "";
     } else {
       classRulesText.value = "";
+      paymeImageUrlInput.value = "";
+      paymeLinkInput.value = "";
     }
   } catch (error) {
     console.error("讀取課堂資訊失敗", error);
@@ -301,8 +307,12 @@ classRulesForm.addEventListener("submit", async (event) => {
   try {
     rulesStatus.classList.add("hidden");
     const content = classRulesText.value.trim();
+    const paymeImageUrl = paymeImageUrlInput.value.trim();
+    const paymeLink = paymeLinkInput.value.trim();
     await setDoc(doc(db, "siteInfo", "classRules"), {
       content,
+      paymeImageUrl,
+      paymeLink,
       updatedAt: Date.now(),
     }, { merge: true });
     rulesStatus.textContent = "課堂資訊已保存！";

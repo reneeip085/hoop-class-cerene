@@ -18,6 +18,9 @@ const searchDateInput = document.getElementById("searchDate");
 const clearSearchDateBtn = document.getElementById("clearSearchDate");
 const classRulesContent = document.getElementById("classRulesContent");
 const classRulesUpdatedAt = document.getElementById("classRulesUpdatedAt");
+const paymeSection = document.getElementById("paymeSection");
+const paymeLinkEl = document.getElementById("paymeLink");
+const paymeImageEl = document.getElementById("paymeImage");
 
 const nameDialog = document.getElementById("nameDialog");
 const nameForm = document.getElementById("nameForm");
@@ -27,6 +30,7 @@ const studentPinInput = document.getElementById("studentPin");
 const studentContactInput = document.getElementById("studentContact");
 const studentPaymentMethodInput = document.getElementById("studentPaymentMethod");
 const studentPaymentDateInput = document.getElementById("studentPaymentDate");
+const signupPaymentWrap = document.getElementById("signupPaymentWrap");
 
 const statusDialog = document.getElementById("statusDialog");
 const statusForm = document.getElementById("statusForm");
@@ -166,6 +170,15 @@ function parseClassDateTime(classItem) {
   return new Date(date.year, date.month - 1, date.day, time.hour, time.minute, 0, 0);
 }
 
+function parseClassEndDateTime(classItem) {
+  const date = parseDateParts(classItem?.date);
+  if (!date) {
+    return new Date(NaN);
+  }
+  const time = parseTimeParts(classItem?.endTime);
+  return new Date(date.year, date.month - 1, date.day, time.hour, time.minute, 0, 0);
+}
+
 function isWithin24Hours(classItem) {
   const diff = parseClassDateTime(classItem).getTime() - Date.now();
   return diff > 0 && diff <= TWENTY_FOUR_HOURS_MS;
@@ -191,7 +204,7 @@ function getUpcoming(items) {
   today.setHours(0, 0, 0, 0);
   return items
     .filter((item) => {
-      const dt = parseClassDateTime(item);
+      const dt = parseClassEndDateTime(item);
       if (!Number.isNaN(dt.getTime())) {
         return dt >= now;
       }
@@ -242,6 +255,13 @@ async function getStoredPrivateContact(classId, seatIndex, studentName, pin) {
   const primarySnap = await getDoc(doc(db, "privateContacts", primaryId));
   if (primarySnap.exists()) {
     return primarySnap.data().contactMethod || "";
+  }
+
+  // Fallback: contact was stored while on waitlist
+  const waitlistId = buildPrivateContactDocId(classId, "waitlist", pin);
+  const waitlistSnap = await getDoc(doc(db, "privateContacts", waitlistId));
+  if (waitlistSnap.exists()) {
+    return waitlistSnap.data().contactMethod || "";
   }
 
   const namePinId = buildLegacyNamePinDocId(classId, studentName, pin);
@@ -404,6 +424,11 @@ function classCard(item) {
       status.textContent = formatSeatStatus(value);
       seat.appendChild(status);
 
+      const dateDiv = document.createElement("div");
+      dateDiv.className = "status";
+      dateDiv.textContent = `付款日期：${value.paymentDate || "未提供"}`;
+      seat.appendChild(dateDiv);
+
       const btn = document.createElement("button");
       btn.className = "button secondary";
       btn.textContent = "更新資料";
@@ -490,9 +515,35 @@ async function loadClassRules() {
     onSnapshot(doc(db, "siteInfo", "classRules"), (snap) => {
       const content = snap.exists() ? snap.data().content : "";
       const updatedAt = snap.exists() ? snap.data().updatedAt : null;
+      const paymeImageUrl = snap.exists() ? snap.data().paymeImageUrl : "";
+      const paymeLink = snap.exists() ? snap.data().paymeLink : "";
+
       if (classRulesContent) {
         classRulesContent.textContent = content;
       }
+
+      // PayMe section
+      if (paymeSection) {
+        const hasPayme = paymeImageUrl || paymeLink;
+        paymeSection.classList.toggle("hidden", !hasPayme);
+        if (paymeLinkEl) {
+          if (paymeLink) {
+            paymeLinkEl.href = paymeLink;
+            paymeLinkEl.classList.remove("hidden");
+          } else {
+            paymeLinkEl.classList.add("hidden");
+          }
+        }
+        if (paymeImageEl) {
+          if (paymeImageUrl) {
+            paymeImageEl.src = paymeImageUrl;
+            paymeImageEl.classList.remove("hidden");
+          } else {
+            paymeImageEl.classList.add("hidden");
+          }
+        }
+      }
+
       if (classRulesUpdatedAt) {
         if (!updatedAt) {
           classRulesUpdatedAt.textContent = "";
@@ -522,7 +573,8 @@ async function loadClassRules() {
 
 function openNameDialog(classId, seatIndex) {
   pendingSignupClassId = classId;
-  nameDialogTitle.textContent = seatIndex == null ? "加入等候名單" : `報名名額 ${seatIndex + 1}`;
+  const isWaitlist = seatIndex == null;
+  nameDialogTitle.textContent = isWaitlist ? "加入等候名單" : `報名名額 ${seatIndex + 1}`;
   studentNameInput.value = "";
   studentPinInput.value = "";
   if (studentContactInput) {
@@ -533,6 +585,9 @@ function openNameDialog(classId, seatIndex) {
   }
   if (studentPaymentDateInput) {
     studentPaymentDateInput.value = "";
+  }
+  if (signupPaymentWrap) {
+    signupPaymentWrap.classList.toggle("hidden", isWaitlist);
   }
   nameDialog.showModal();
 }
@@ -766,6 +821,8 @@ async function cancelEntry(classId, type, index, confirmPin) {
   const classRef = doc(db, "classes", classId);
   let studentName = "";
   let promotedName = "";
+  let promotedPin = "";
+  let promotedSeatIndex = -1;
 
   await runTransaction(db, async (transaction) => {
     const snap = await transaction.get(classRef);
@@ -799,8 +856,10 @@ async function cancelEntry(classId, type, index, confirmPin) {
       if (waitlist.length > 0) {
         const next = waitlist.shift();
         promotedName = next.name;
+        promotedPin = next.pin || "";
         const empty = compacted.findIndex((x) => !x);
         if (empty >= 0) {
+          promotedSeatIndex = empty;
           compacted[empty] = {
             name: next.name,
             pin: next.pin,
@@ -837,6 +896,24 @@ async function cancelEntry(classId, type, index, confirmPin) {
   });
 
   if (type === "seat") {
+    // Migrate contact info from waitlist key to seat key for promoted student
+    if (promotedName && promotedSeatIndex >= 0 && promotedPin) {
+      try {
+        const waitlistDocId = buildPrivateContactDocId(classId, "waitlist", promotedPin);
+        const waitlistSnap = await getDoc(doc(db, "privateContacts", waitlistDocId));
+        if (waitlistSnap.exists()) {
+          const newDocId = buildPrivateContactDocId(classId, promotedSeatIndex, promotedPin);
+          await setDoc(doc(db, "privateContacts", newDocId), {
+            ...waitlistSnap.data(),
+            seatIndex: promotedSeatIndex,
+            updatedAt: Date.now(),
+          }, { merge: true });
+        }
+      } catch (e) {
+        console.error("遷移聯絡資料失敗", e);
+      }
+    }
+
     logOperation("student_cancel_booking", {
       classId,
       seatIndex: index,

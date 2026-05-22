@@ -104,12 +104,7 @@ function buildRangeFromDate(value) {
 
 function buildBaseQuery() {
   const constraints = [];
-  const actionSource = actionFilter.value;
   const dateRange = buildRangeFromDate(dateFilter.value);
-
-  if (actionSource) {
-    constraints.push(where("source", "==", actionSource));
-  }
 
   if (dateRange) {
     constraints.push(where("createdAt", ">=", dateRange.start));
@@ -190,7 +185,11 @@ function renderTableRow(op) {
 }
 
 function render() {
-  const total = currentOperations.length;
+  const actionSource = actionFilter.value;
+  const filtered = actionSource
+    ? currentOperations.filter((op) => getActionSource(op.action) === actionSource)
+    : currentOperations;
+  const total = filtered.length;
 
   if (total === 0) {
     operationList.innerHTML = "";
@@ -222,7 +221,7 @@ function render() {
   table.appendChild(thead);
 
   const tbody = document.createElement("tbody");
-  currentOperations.forEach((op) => {
+  filtered.forEach((op) => {
     const row = renderTableRow(op);
     row.style.borderBottom = "1px solid #eee";
     [...row.children].forEach((cell) => {
@@ -245,7 +244,7 @@ clearDateFilterBtn.addEventListener("click", () => {
   dateFilter.value = "";
   resetAndLoadFirstPage();
 });
-actionFilter.addEventListener("change", resetAndLoadFirstPage);
+actionFilter.addEventListener("change", render);
 refreshOpsBtn.addEventListener("click", resetAndLoadFirstPage);
 
 prevBtn.addEventListener("click", () => {

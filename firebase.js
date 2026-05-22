@@ -27,12 +27,12 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDqyeVGSWjd5vnVjhX5j2e89bkFPWuMKXg",
-  authDomain: "hoop-class.firebaseapp.com",
-  projectId: "hoop-class",
-  storageBucket: "hoop-class.firebasestorage.app",
-  messagingSenderId: "127999931742",
-  appId: "1:127999931742:web:bd427ba5135dea85068bcf",
+  apiKey: "AIzaSyCi7SG7IbzFWyJNU0GkdCio9i0-tHnC_CU",
+  authDomain: "private-class-cerene.firebaseapp.com",
+  projectId: "private-class-cerene",
+  storageBucket: "private-class-cerene.firebasestorage.app",
+  messagingSenderId: "749947935016",
+  appId: "1:749947935016:web:63126e6684285fac70d81d",
 };
 
 const app = initializeApp(firebaseConfig);

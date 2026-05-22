@@ -16,5 +16,16 @@ service cloud.firestore {
       allow create: if true;
       allow update, delete: if false;
     }
+
+    match /siteInfo/{document=**} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    match /privateContacts/{contactId} {
+      allow read: if isSignedIn();
+      allow create, update: if true;
+      allow delete: if isSignedIn();
+    }
   }
 }
