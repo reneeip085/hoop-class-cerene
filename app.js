@@ -19,7 +19,6 @@ const clearSearchDateBtn = document.getElementById("clearSearchDate");
 const classRulesContent = document.getElementById("classRulesContent");
 const classRulesUpdatedAt = document.getElementById("classRulesUpdatedAt");
 const paymeSection = document.getElementById("paymeSection");
-const paymeImagesEl = document.getElementById("paymeImages");
 const paymeLinksEl = document.getElementById("paymeLinks");
 
 const nameDialog = document.getElementById("nameDialog");
@@ -522,24 +521,8 @@ async function loadClassRules() {
 
       // PayMe section
       if (paymeSection) {
-        const images = Array.isArray(snap.exists() && snap.data().images) ? snap.data().images : [];
         const links = Array.isArray(snap.exists() && snap.data().links) ? snap.data().links : [];
-        const hasPayme = images.length > 0 || links.length > 0;
-        paymeSection.classList.toggle("hidden", !hasPayme);
-
-        if (paymeImagesEl) {
-          paymeImagesEl.innerHTML = "";
-          images.forEach((url) => {
-            if (!url) return;
-            const img = document.createElement("img");
-            img.src = url;
-            img.alt = "圖片";
-            img.style.maxWidth = "220px";
-            img.style.borderRadius = "8px";
-            img.style.display = "block";
-            paymeImagesEl.appendChild(img);
-          });
-        }
+        paymeSection.classList.toggle("hidden", links.length === 0);
 
         if (paymeLinksEl) {
           paymeLinksEl.innerHTML = "";

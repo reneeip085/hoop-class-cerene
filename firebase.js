@@ -25,13 +25,6 @@ import {
   onSnapshot,
   runTransaction,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import {
-  getStorage,
-  ref,
-  uploadBytes,
-  getDownloadURL,
-  deleteObject,
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCi7SG7IbzFWyJNU0GkdCio9i0-tHnC_CU",
@@ -45,8 +38,14 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
-const storage = getStorage(app);
 setPersistence(auth, browserLocalPersistence);
+
+let storage = null;
+try {
+  storage = getStorage(app);
+} catch (e) {
+  console.warn("Firebase Storage 未啟用或初始化失敗", e);
+}
 
 export {
   auth,
@@ -69,9 +68,4 @@ export {
   startAfter,
   onSnapshot,
   runTransaction,
-  storage,
-  ref,
-  uploadBytes,
-  getDownloadURL,
-  deleteObject,
 };

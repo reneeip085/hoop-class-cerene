@@ -12,10 +12,6 @@ import {
   getDoc,
   setDoc,
   onSnapshot,
-  storage,
-  ref,
-  uploadBytes,
-  getDownloadURL,
 } from "./firebase.js";
 
 const CLASS_CAPACITY = 6;
@@ -35,9 +31,7 @@ const cancelEditBtn = document.getElementById("cancelEdit");
 
 const classRulesForm = document.getElementById("classRulesForm");
 const classRulesText = document.getElementById("classRulesText");
-const imageListEl = document.getElementById("imageList");
 const linkListEl = document.getElementById("linkList");
-const addImageBtn = document.getElementById("addImageBtn");
 const addLinkBtn = document.getElementById("addLinkBtn");
 const rulesStatus = document.getElementById("rulesStatus");
 
@@ -286,68 +280,7 @@ logoutBtn.addEventListener("click", async () => {
   }
 });
 
-// ── Image / Link list helpers ───────────────────────────────────
-function addImageRow(urlValue = "") {
-  const row = document.createElement("div");
-  row.className = "inline-buttons";
-  row.style.alignItems = "flex-start";
-
-  const urlInput = document.createElement("input");
-  urlInput.type = "url";
-  urlInput.placeholder = "圖片 URL（上傳後自動填入）";
-  urlInput.value = urlValue;
-  urlInput.style.flex = "1";
-  urlInput.dataset.role = "imageUrl";
-
-  const fileInput = document.createElement("input");
-  fileInput.type = "file";
-  fileInput.accept = "image/*";
-  fileInput.style.display = "none";
-
-  const uploadBtn = document.createElement("button");
-  uploadBtn.type = "button";
-  uploadBtn.className = "button secondary";
-  uploadBtn.textContent = "上傳";
-  uploadBtn.addEventListener("click", () => fileInput.click());
-
-  const uploadStatus = document.createElement("span");
-  uploadStatus.className = "muted";
-  uploadStatus.style.fontSize = "12px";
-  uploadStatus.style.minWidth = "40px";
-
-  fileInput.addEventListener("change", async () => {
-    const file = fileInput.files[0];
-    if (!file) return;
-    uploadStatus.textContent = "上傳中...";
-    uploadBtn.disabled = true;
-    try {
-      const storageRef = ref(storage, `siteImages/${Date.now()}_${file.name}`);
-      await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(storageRef);
-      urlInput.value = url;
-      uploadStatus.textContent = "✓";
-    } catch (e) {
-      uploadStatus.textContent = "失敗";
-      console.error("圖片上傳失敗", e);
-    } finally {
-      uploadBtn.disabled = false;
-    }
-  });
-
-  const removeBtn = document.createElement("button");
-  removeBtn.type = "button";
-  removeBtn.className = "button secondary";
-  removeBtn.textContent = "✕";
-  removeBtn.addEventListener("click", () => row.remove());
-
-  row.appendChild(urlInput);
-  row.appendChild(uploadBtn);
-  row.appendChild(uploadStatus);
-  row.appendChild(fileInput);
-  row.appendChild(removeBtn);
-  imageListEl.appendChild(row);
-}
-
+// ── Link list helpers ───────────────────────────────────────────
 function addLinkRow(urlValue = "", labelValue = "") {
   const row = document.createElement("div");
   row.className = "inline-buttons";
@@ -379,7 +312,6 @@ function addLinkRow(urlValue = "", labelValue = "") {
   linkListEl.appendChild(row);
 }
 
-addImageBtn.addEventListener("click", () => addImageRow());
 addLinkBtn.addEventListener("click", () => addLinkRow());
 
 async function loadClassRulesForEdit() {
@@ -387,9 +319,7 @@ async function loadClassRulesForEdit() {
     const snap = await getDoc(doc(db, "siteInfo", "classRules"));
     const data = snap.exists() ? snap.data() : {};
     classRulesText.value = data.content || "";
-    imageListEl.innerHTML = "";
     linkListEl.innerHTML = "";
-    (data.images || []).forEach((url) => addImageRow(url));
     (data.links || []).forEach((item) => addLinkRow(item.url || "", item.label || ""));
   } catch (error) {
     console.error("讀取課堂資訊失敗", error);
@@ -407,10 +337,6 @@ classRulesForm.addEventListener("submit", async (event) => {
     rulesStatus.classList.add("hidden");
     const content = classRulesText.value.trim();
 
-    const images = [...imageListEl.querySelectorAll("[data-role='imageUrl']")]
-      .map((el) => el.value.trim())
-      .filter(Boolean);
-
     const linksData = [...linkListEl.children].map((row) => ({
       label: row.querySelector("[data-role='linkLabel']")?.value.trim() || "",
       url: row.querySelector("[data-role='linkUrl']")?.value.trim() || "",
@@ -418,7 +344,6 @@ classRulesForm.addEventListener("submit", async (event) => {
 
     await setDoc(doc(db, "siteInfo", "classRules"), {
       content,
-      images,
       links: linksData,
       updatedAt: Date.now(),
     }, { merge: true });
