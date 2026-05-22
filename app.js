@@ -19,8 +19,8 @@ const clearSearchDateBtn = document.getElementById("clearSearchDate");
 const classRulesContent = document.getElementById("classRulesContent");
 const classRulesUpdatedAt = document.getElementById("classRulesUpdatedAt");
 const paymeSection = document.getElementById("paymeSection");
-const paymeLinkEl = document.getElementById("paymeLink");
-const paymeImageEl = document.getElementById("paymeImage");
+const paymeImagesEl = document.getElementById("paymeImages");
+const paymeLinksEl = document.getElementById("paymeLinks");
 
 const nameDialog = document.getElementById("nameDialog");
 const nameForm = document.getElementById("nameForm");
@@ -515,8 +515,6 @@ async function loadClassRules() {
     onSnapshot(doc(db, "siteInfo", "classRules"), (snap) => {
       const content = snap.exists() ? snap.data().content : "";
       const updatedAt = snap.exists() ? snap.data().updatedAt : null;
-      const paymeImageUrl = snap.exists() ? snap.data().paymeImageUrl : "";
-      const paymeLink = snap.exists() ? snap.data().paymeLink : "";
 
       if (classRulesContent) {
         classRulesContent.textContent = content;
@@ -524,23 +522,37 @@ async function loadClassRules() {
 
       // PayMe section
       if (paymeSection) {
-        const hasPayme = paymeImageUrl || paymeLink;
+        const images = Array.isArray(snap.exists() && snap.data().images) ? snap.data().images : [];
+        const links = Array.isArray(snap.exists() && snap.data().links) ? snap.data().links : [];
+        const hasPayme = images.length > 0 || links.length > 0;
         paymeSection.classList.toggle("hidden", !hasPayme);
-        if (paymeLinkEl) {
-          if (paymeLink) {
-            paymeLinkEl.href = paymeLink;
-            paymeLinkEl.classList.remove("hidden");
-          } else {
-            paymeLinkEl.classList.add("hidden");
-          }
+
+        if (paymeImagesEl) {
+          paymeImagesEl.innerHTML = "";
+          images.forEach((url) => {
+            if (!url) return;
+            const img = document.createElement("img");
+            img.src = url;
+            img.alt = "圖片";
+            img.style.maxWidth = "220px";
+            img.style.borderRadius = "8px";
+            img.style.display = "block";
+            paymeImagesEl.appendChild(img);
+          });
         }
-        if (paymeImageEl) {
-          if (paymeImageUrl) {
-            paymeImageEl.src = paymeImageUrl;
-            paymeImageEl.classList.remove("hidden");
-          } else {
-            paymeImageEl.classList.add("hidden");
-          }
+
+        if (paymeLinksEl) {
+          paymeLinksEl.innerHTML = "";
+          links.forEach((item) => {
+            if (!item.url) return;
+            const a = document.createElement("a");
+            a.href = item.url;
+            a.target = "_blank";
+            a.rel = "noopener noreferrer";
+            a.textContent = item.label || item.url;
+            a.style.display = "block";
+            paymeLinksEl.appendChild(a);
+          });
         }
       }
 
