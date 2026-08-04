@@ -255,16 +255,54 @@ editClassForm.addEventListener("submit", async (event) => {
     updatedAt: Date.now(),
   };
 
-  // 調整 seats 陣列長度以配合新上限
+  // 調整 seats 陣列長度以配合新上限，並從等候名單補位
   const currentSeats = Array.isArray(currentData.seats) ? [...currentData.seats] : Array(currentCapacity).fill(null);
-  const resizedSeats = [...currentSeats.filter(Boolean), ...Array(newCapacity).fill(null)].slice(0, newCapacity);
+  let resizedSeats = [...currentSeats.filter(Boolean), ...Array(newCapacity).fill(null)].slice(0, newCapacity);
+  const waitlist = Array.isArray(currentData.waitlist) ? [...currentData.waitlist].filter(Boolean) : [];
+  const promoted = [];
+
+  while (waitlist.length > 0) {
+    const emptyIndex = resizedSeats.findIndex((x) => !x);
+    if (emptyIndex < 0) break;
+    const next = waitlist.shift();
+    resizedSeats[emptyIndex] = {
+      name: next.name,
+      pin: next.pin,
+      paymentMethod: "",
+      paymentDate: "",
+      fromWaitlistAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    promoted.push({ seatIndex: emptyIndex, pin: next.pin, name: next.name });
+  }
+
   payload.seats = resizedSeats;
+  payload.waitlist = waitlist;
 
   try {
     await updateDoc(doc(db, "classes", id), payload);
+
+    for (const p of promoted) {
+      try {
+        const waitlistDocId = buildPrivateContactDocId(id, "waitlist", p.pin);
+        const waitlistSnap = await getDoc(doc(db, "privateContacts", waitlistDocId));
+        if (waitlistSnap.exists()) {
+          const newDocId = buildPrivateContactDocId(id, p.seatIndex, p.pin);
+          await setDoc(doc(db, "privateContacts", newDocId), {
+            ...waitlistSnap.data(),
+            seatIndex: p.seatIndex,
+            updatedAt: Date.now(),
+          }, { merge: true });
+        }
+      } catch (e) {
+        console.error("遷移聯絡資料失敗", e);
+      }
+    }
+
     await logOperation("admin_update_class", {
       classId: id,
       header: formatClassHeader(payload.date, payload.startTime, payload.endTime),
+      promoted: promoted.map((p) => p.name),
     });
     editClassDialog.close();
   } catch (e) {

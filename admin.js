@@ -47,6 +47,14 @@ const songFields = document.getElementById("songFields");
 
 let isAdminReady = false;
 
+function getCapacity(item) {
+  return Number(item?.capacity) || CLASS_CAPACITY;
+}
+
+function buildPrivateContactDocId(classId, seatIndex, pin) {
+  const key = `${String(classId || "")}_${String(seatIndex ?? "")}_${String(pin || "").trim().toLowerCase()}`;
+  return key.replace(/[^a-z0-9_-]/gi, "_");
+}
 
 function selectedLevels() {
   return levelInputs.filter((x) => x.checked).map((x) => x.value);
@@ -237,8 +245,61 @@ async function saveClass(event) {
 
     const id = editingClassId.value;
     if (id) {
+      const classSnap = await getDoc(doc(db, "classes", id));
+      const currentData = classSnap.exists() ? classSnap.data() : {};
+      const currentCapacity = getCapacity(currentData);
+      const used = (Array.isArray(currentData.seats) ? currentData.seats : []).filter(Boolean).length;
+      if (capacity < used) {
+        throw new Error(`目前已有 ${used} 人報名，人數上限不可少於 ${used}。`);
+      }
+
+      const currentSeats = Array.isArray(currentData.seats) ? [...currentData.seats] : Array(currentCapacity).fill(null);
+      let resizedSeats = [...currentSeats.filter(Boolean), ...Array(capacity).fill(null)].slice(0, capacity);
+      const waitlist = Array.isArray(currentData.waitlist) ? [...currentData.waitlist].filter(Boolean) : [];
+      const promoted = [];
+
+      while (waitlist.length > 0) {
+        const emptyIndex = resizedSeats.findIndex((x) => !x);
+        if (emptyIndex < 0) break;
+        const next = waitlist.shift();
+        resizedSeats[emptyIndex] = {
+          name: next.name,
+          pin: next.pin,
+          paymentMethod: "",
+          paymentDate: "",
+          fromWaitlistAt: Date.now(),
+          updatedAt: Date.now(),
+        };
+        promoted.push({ seatIndex: emptyIndex, pin: next.pin, name: next.name });
+      }
+
+      payload.seats = resizedSeats;
+      payload.waitlist = waitlist;
+
       await updateDoc(doc(db, "classes", id), payload);
-      await logOperation("admin_update_class", { classId: id, header: formatHeader(payload) });
+
+      for (const p of promoted) {
+        try {
+          const waitlistDocId = buildPrivateContactDocId(id, "waitlist", p.pin);
+          const waitlistSnap = await getDoc(doc(db, "privateContacts", waitlistDocId));
+          if (waitlistSnap.exists()) {
+            const newDocId = buildPrivateContactDocId(id, p.seatIndex, p.pin);
+            await setDoc(doc(db, "privateContacts", newDocId), {
+              ...waitlistSnap.data(),
+              seatIndex: p.seatIndex,
+              updatedAt: Date.now(),
+            }, { merge: true });
+          }
+        } catch (e) {
+          console.error("遷移聯絡資料失敗", e);
+        }
+      }
+
+      await logOperation("admin_update_class", {
+        classId: id,
+        header: formatHeader(payload),
+        promoted: promoted.map((p) => p.name),
+      });
       resetForm();
       return;
     }
