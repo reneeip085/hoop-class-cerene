@@ -12,6 +12,10 @@ import {
 const CLASS_CAPACITY = 6;
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
+function getCapacity(item) {
+  return Number(item?.capacity) || CLASS_CAPACITY;
+}
+
 const upcomingContainer = document.getElementById("upcomingClasses");
 const noUpcoming = document.getElementById("noUpcoming");
 const searchDateInput = document.getElementById("searchDate");
@@ -296,9 +300,10 @@ function formatSeatStatus(seat) {
   return seat.status || "未填付款方式";
 }
 
-function normalizeSeats(seats) {
+function normalizeSeats(seats, capacity) {
+  const cap = capacity || CLASS_CAPACITY;
   const taken = seats.filter(Boolean);
-  return [...taken, ...Array(CLASS_CAPACITY - taken.length).fill(null)];
+  return [...taken, ...Array(Math.max(0, cap - taken.length)).fill(null)];
 }
 
 function normalizeWaitlist(waitlist) {
@@ -329,7 +334,8 @@ function getActiveSeatRecord() {
   if (!classItem) {
     return null;
   }
-  const seats = normalizeSeats(Array.isArray(classItem.seats) ? classItem.seats : []);
+  const capacity = getCapacity(classItem);
+  const seats = normalizeSeats(Array.isArray(classItem.seats) ? classItem.seats : [], capacity);
   const seat = seats[activeStatusIndex];
   if (!seat) {
     return null;
@@ -381,15 +387,16 @@ function classCard(item) {
   }
   wrapper.appendChild(songs);
 
-  const seats = normalizeSeats(Array.isArray(item.seats) ? item.seats : []);
+  const capacity = getCapacity(item);
+  const seats = normalizeSeats(Array.isArray(item.seats) ? item.seats : [], capacity);
   const waitlist = normalizeWaitlist(item.waitlist);
   const used = seats.filter(Boolean).length;
-  const remain = CLASS_CAPACITY - used;
+  const remain = capacity - used;
   const locked = isWithin24Hours(item);
 
   const seatMeta = document.createElement("p");
   seatMeta.className = "meta";
-  seatMeta.textContent = `名額：${used}/${CLASS_CAPACITY}（剩餘 ${remain}）`;
+  seatMeta.textContent = `名額：${used}/${capacity}（剩餘 ${remain}）`;
   wrapper.appendChild(seatMeta);
 
   const waitlistMeta = document.createElement("p");
@@ -407,7 +414,7 @@ function classCard(item) {
   const seatGrid = document.createElement("div");
   seatGrid.className = "seat-grid";
 
-  for (let i = 0; i < CLASS_CAPACITY; i += 1) {
+  for (let i = 0; i < capacity; i += 1) {
     const seat = document.createElement("div");
     const value = seats[i];
     seat.className = "seat";
@@ -600,7 +607,8 @@ async function signup(classId, studentName, studentPin, contactMethod, paymentMe
 
     const data = snap.data();
     classData = data;
-    const seats = normalizeSeats(Array.isArray(data.seats) ? [...data.seats] : Array(CLASS_CAPACITY).fill(null));
+    const capacity = getCapacity(data);
+    const seats = normalizeSeats(Array.isArray(data.seats) ? [...data.seats] : Array(capacity).fill(null), capacity);
     const waitlist = normalizeWaitlist(data.waitlist);
 
     if (seats.find((s) => s && normalizeName(s.name) === normalizeName(studentName))) {
@@ -612,7 +620,7 @@ async function signup(classId, studentName, studentPin, contactMethod, paymentMe
     }
 
     const used = seats.filter(Boolean).length;
-    if (used < CLASS_CAPACITY) {
+    if (used < capacity) {
       const firstEmpty = seats.findIndex((x) => !x);
       seats[firstEmpty] = {
         name: studentName,
@@ -777,7 +785,8 @@ async function updatePaymentMethod(classId, seatIndex, confirmPin, paymentMethod
       throw new Error("開班前 24 小時內不可修改資料");
     }
 
-    const seats = normalizeSeats(Array.isArray(data.seats) ? [...data.seats] : []);
+    const capacity = getCapacity(data);
+    const seats = normalizeSeats(Array.isArray(data.seats) ? [...data.seats] : [], capacity);
     const seat = seats[seatIndex];
 
     if (!seat) {
@@ -830,7 +839,8 @@ async function cancelEntry(classId, type, index, confirmPin) {
       throw new Error("開班前 24 小時內不可取消報名或等候");
     }
 
-    const seats = normalizeSeats(Array.isArray(data.seats) ? [...data.seats] : []);
+    const capacity = getCapacity(data);
+    const seats = normalizeSeats(Array.isArray(data.seats) ? [...data.seats] : [], capacity);
     const waitlist = normalizeWaitlist(data.waitlist);
 
     if (type === "seat") {
@@ -847,7 +857,7 @@ async function cancelEntry(classId, type, index, confirmPin) {
       studentName = seat.name;
       seats[index] = null;
 
-      const compacted = normalizeSeats(seats);
+      const compacted = normalizeSeats(seats, capacity);
       if (waitlist.length > 0) {
         const next = waitlist.shift();
         promotedName = next.name;

@@ -16,6 +16,10 @@ import {
 const CLASS_CAPACITY = 6;
 const LEVELS = ["Lv0", "Lv1", "Lv2"];
 
+function getCapacity(item) {
+  return Number(item?.capacity) || CLASS_CAPACITY;
+}
+
 const searchDateInput = document.getElementById("searchDate");
 const clearSearchBtn = document.getElementById("clearSearch");
 const sortToggleBtn = document.getElementById("sortToggle");
@@ -32,6 +36,7 @@ const editStartMinute = document.getElementById("editStartMinute");
 const editEndHour = document.getElementById("editEndHour");
 const editEndMinute = document.getElementById("editEndMinute");
 const editLocationInput = document.getElementById("editLocation");
+const editCapacityInput = document.getElementById("editCapacity");
 const editLevelInputs = [...document.querySelectorAll('input[name="editLevels"]')];
 const editSongFields = document.getElementById("editSongFields");
 const cancelEditClassBtn = document.getElementById("cancelEditClassBtn");
@@ -192,6 +197,9 @@ function openEditClassDialog(item) {
   editEndHour.value = eh;
   editEndMinute.value = em;
   editLocationInput.value = item.location || "";
+  if (editCapacityInput) {
+    editCapacityInput.value = String(item.capacity || CLASS_CAPACITY);
+  }
   editLevelInputs.forEach((input) => {
     input.checked = (item.levels || []).includes(input.value);
   });
@@ -226,6 +234,16 @@ editClassForm.addEventListener("submit", async (event) => {
     songs[lv] = song;
   }
 
+  const newCapacity = Math.max(1, parseInt(editCapacityInput?.value, 10) || CLASS_CAPACITY);
+  const snap = await getDoc(doc(db, "classes", id));
+  const currentData = snap.exists() ? snap.data() : {};
+  const currentCapacity = getCapacity(currentData);
+  const used = (Array.isArray(currentData.seats) ? currentData.seats : []).filter(Boolean).length;
+  if (newCapacity < used) {
+    alert(`目前已有 ${used} 人報名，人數上限不可少於 ${used}。`);
+    return;
+  }
+
   const payload = {
     date: editDateInput.value,
     startTime,
@@ -233,8 +251,14 @@ editClassForm.addEventListener("submit", async (event) => {
     location: editLocationInput.value.trim(),
     levels,
     songs,
+    capacity: newCapacity,
     updatedAt: Date.now(),
   };
+
+  // 調整 seats 陣列長度以配合新上限
+  const currentSeats = Array.isArray(currentData.seats) ? [...currentData.seats] : Array(currentCapacity).fill(null);
+  const resizedSeats = [...currentSeats.filter(Boolean), ...Array(newCapacity).fill(null)].slice(0, newCapacity);
+  payload.seats = resizedSeats;
 
   try {
     await updateDoc(doc(db, "classes", id), payload);
@@ -275,15 +299,16 @@ async function clearSeat(classId, index) {
     const snap = await transaction.get(classRef);
     if (!snap.exists()) return;
     const data = snap.data();
+    const capacity = getCapacity(data);
 
-    const seats = Array.isArray(data.seats) ? [...data.seats] : Array(CLASS_CAPACITY).fill(null);
+    const seats = Array.isArray(data.seats) ? [...data.seats] : Array(capacity).fill(null);
     const waitlist = Array.isArray(data.waitlist) ? [...data.waitlist].filter(Boolean) : [];
 
     removedName = seats[index]?.name || "";
     seats[index] = null;
 
     // Compact seats and promote from waitlist if any
-    const compacted = [...seats.filter(Boolean), ...Array(CLASS_CAPACITY).fill(null)].slice(0, CLASS_CAPACITY);
+    const compacted = [...seats.filter(Boolean), ...Array(capacity).fill(null)].slice(0, capacity);
     if (waitlist.length > 0) {
       const next = waitlist.shift();
       promotedName = next.name;
@@ -374,16 +399,17 @@ function renderClassCard(item) {
   });
   card.appendChild(songs);
 
-  const seats = Array.isArray(item.seats) ? item.seats : Array(CLASS_CAPACITY).fill(null);
+  const capacity = getCapacity(item);
+  const seats = Array.isArray(item.seats) ? item.seats : Array(capacity).fill(null);
   const used = seats.filter(Boolean).length;
   const meta = document.createElement("p");
   meta.className = "meta";
-  meta.textContent = `名額：${used}/${CLASS_CAPACITY}`;
+  meta.textContent = `名額：${used}/${capacity}`;
   card.appendChild(meta);
 
   const seatGrid = document.createElement("div");
   seatGrid.className = "seat-grid";
-  for (let i = 0; i < CLASS_CAPACITY; i += 1) {
+  for (let i = 0; i < capacity; i += 1) {
     const seat = document.createElement("div");
     seat.className = "seat";
     const value = seats[i];

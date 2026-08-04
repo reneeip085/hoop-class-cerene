@@ -41,6 +41,7 @@ const startMinuteInput = document.getElementById("startMinute");
 const endHourInput = document.getElementById("endHour");
 const endMinuteInput = document.getElementById("endMinute");
 const locationInput = document.getElementById("location");
+const capacityInput = document.getElementById("capacity");
 const levelInputs = [...document.querySelectorAll('input[name="levels"]')];
 const songFields = document.getElementById("songFields");
 
@@ -150,6 +151,9 @@ function resetForm() {
   editingClassId.value = "";
   formTitle.textContent = "新增班期";
   cancelEditBtn.classList.add("hidden");
+  if (capacityInput) {
+    capacityInput.value = String(CLASS_CAPACITY);
+  }
   buildSongFields();
 }
 
@@ -176,6 +180,9 @@ function fillForm(item) {
   endHourInput.value = endHour;
   endMinuteInput.value = endMinute;
   locationInput.value = item.location;
+  if (capacityInput) {
+    capacityInput.value = String(item.capacity || CLASS_CAPACITY);
+  }
 
   levelInputs.forEach((input) => {
     input.checked = (item.levels || []).includes(input.value);
@@ -208,6 +215,7 @@ async function saveClass(event) {
     const levels = selectedLevels();
     validateLevels(levels);
 
+    const capacity = Math.max(1, parseInt(capacityInput.value, 10) || CLASS_CAPACITY);
     const payload = {
       date: dateInput.value,
       startTime,
@@ -215,7 +223,7 @@ async function saveClass(event) {
       location: locationInput.value.trim(),
       levels,
       songs: collectSongs(levels),
-      capacity: CLASS_CAPACITY,
+      capacity,
       updatedAt: Date.now(),
     };
 
@@ -237,7 +245,7 @@ async function saveClass(event) {
 
     const created = await addDoc(collection(db, "classes"), {
       ...payload,
-      seats: Array(CLASS_CAPACITY).fill(null),
+      seats: Array(payload.capacity).fill(null),
       createdAt: Date.now(),
     });
     await logOperation("admin_create_class", { classId: created.id, header: formatHeader(payload) });

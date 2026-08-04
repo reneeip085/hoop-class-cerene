@@ -4,7 +4,7 @@ This workspace is a free web app starter for yoga class registration.
 
 ## What this app supports
 
-- Max 6 seats per class
+- Max seats per class configurable (default 6, e.g. 8)
 - Student signup with live updates
 - Student self-cancel
 - Status update between:

@@ -1,6 +1,9 @@
 import { auth, onAuthStateChanged, db, collection, getDocs, query, orderBy } from "./firebase.js";
 
-const CLASS_CAPACITY = 6;
+const CLASS_CAPACITY = 8;
+function getCapacity(item) {
+  return Number(item?.capacity) || CLASS_CAPACITY;
+}
 const historyContainer = document.getElementById("historyClasses");
 const noHistory = document.getElementById("noHistory");
 
@@ -79,9 +82,10 @@ function classCard(item) {
   const attendees = seats.filter(Boolean);
   const used = attendees.length;
 
+  const capacity = getCapacity(item);
   const seatMeta = document.createElement("p");
   seatMeta.className = "meta";
-  seatMeta.textContent = `出席：${used}/${CLASS_CAPACITY}`;
+  seatMeta.textContent = `出席：${used}/${capacity}`;
   wrapper.appendChild(seatMeta);
 
   if (attendees.length > 0) {
